@@ -4,10 +4,15 @@ const API_BASE_URL = 'http://localhost:8000';
 
 async function fetchWithAuth(url, options = {}) {
     const token = getToken();
+    const isFormData = options.body instanceof FormData;
+
     const headers = {
-        'Content-Type': 'application/json',
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         ...options.headers,
     };
+
+    // Remove any explicitly undefined headers (safety net)
+    Object.keys(headers).forEach(k => { if (headers[k] === undefined) delete headers[k]; });
 
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
@@ -66,6 +71,17 @@ export const api = {
 
         return fetchWithAuth(`/results?${params.toString()}`);
     },
+
+    predictBatch: (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return fetchWithAuth('/predict/batch', {
+            method: 'POST',
+            body: formData,
+        });
+    },
+
+    getTaskStatus: (taskId) => fetchWithAuth(`/tasks/${taskId}`),
 
     getUsers: () => fetchWithAuth('/users'),
 

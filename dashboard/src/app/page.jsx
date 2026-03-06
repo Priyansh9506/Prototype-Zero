@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Papa from 'papaparse';
 
 // Data configs
-import { SAMPLE_DATA, computeMockRisk } from './data';
+import { computeMockRisk } from './data';
 
 // Components
 import Login from './components/Login';
@@ -41,6 +41,37 @@ function LoadingOverlay({ progress, message }) {
   );
 }
 
+// ── LocalStorage helpers for data persistence ──
+const STORAGE_KEY = 'smartcontainer_data';
+
+function saveDataToStorage(rows) {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
+    } catch (e) {
+        console.warn('Could not save data to localStorage:', e);
+    }
+}
+
+function loadDataFromStorage() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+    } catch (e) {
+        console.warn('Could not load data from localStorage:', e);
+    }
+    return null;
+}
+
+function clearDataFromStorage() {
+    try {
+        localStorage.removeItem(STORAGE_KEY);
+    } catch (e) { /* ignore */ }
+}
+
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
@@ -53,14 +84,18 @@ export default function App() {
   // Reclassify containers when threshold changes
   const handleThresholdChange = useCallback((newThreshold) => {
     setCriticalThreshold(newThreshold);
-    setData(prev => prev.map(row => {
-      const score = row.Risk_Score;
-      let level;
-      if (score >= newThreshold) level = 'Critical';
-      else if (score >= newThreshold * 0.5) level = 'Medium Risk';
-      else level = 'Low Risk';
-      return { ...row, Risk_Level: level };
-    }));
+    setData(prev => {
+      const updated = prev.map(row => {
+        const score = row.Risk_Score;
+        let level;
+        if (score >= newThreshold) level = 'Critical';
+        else if (score >= newThreshold * 0.5) level = 'Medium Risk';
+        else level = 'Low Risk';
+        return { ...row, Risk_Level: level };
+      });
+      saveDataToStorage(updated);
+      return updated;
+    });
   }, []);
 
   const [loading, setLoading] = useState(false);
@@ -92,70 +127,110 @@ export default function App() {
     Explanation_Summary: row.explanation_summary ?? row.Explanation_Summary ?? '',
   });
 
-  // Fetch data on login
+  // ── Authentication & Data Initialization ──
   useEffect(() => {
-    if (isAuthenticated) {
-        setLoading(true); setLoadMsg('Fetching Intelligence Data...');
-        Promise.all([
-            api.getStats().catch(e => null),
-            api.getResults(1, 100).catch(e => null)
-        ]).then(([statsRes, resultsRes]) => {
-            if (statsRes) setStats(statsRes);
-            const apiData = resultsRes?.data || [];
-            if (apiData.length > 0) {
-                setData(apiData.map(normalizeRow));
-            } else {
-                // Fall back to sample data if API has no predictions
-                setData(SAMPLE_DATA);
-            }
-            setLoading(false);
-        });
+    const token = getToken();
+    if (!token) {
+      setIsAuthenticated(false);
+      return;
     }
-  }, [isAuthenticated]);
 
-  // Handle Token on Initialize
-  useEffect(() => {
-     const token = getToken();
-     if(token) {
-        api.getUsersMe().then((userData) => {
-            setUser(userData);
-            setIsAuthenticated(true);
-        }).catch(() => {
-            removeToken();
+    // Verify user session, then load data
+    api.getUsersMe()
+      .then((userData) => {
+        setUser(userData);
+        setIsAuthenticated(true);
+
+        // Try to load persisted uploaded data from localStorage first
+        const cached = loadDataFromStorage();
+        if (cached && cached.length > 0) {
+          setData(cached);
+          return; // We have local data, no need to fetch from backend
+        }
+
+        // Otherwise try backend
+        setLoading(true);
+        setLoadMsg('Fetching Intelligence Data...');
+        return Promise.all([
+          api.getStats().catch(() => null),
+          api.getResults(1, 100).catch(() => null)
+        ]).then(([statsRes, resultsRes]) => {
+          if (statsRes) setStats(statsRes);
+          const apiData = resultsRes?.data || [];
+          if (apiData.length > 0) {
+            const normalized = apiData.map(normalizeRow);
+            setData(normalized);
+            saveDataToStorage(normalized);
+          }
+          // If no backend data and no cached data, data stays [] (empty dashboard)
+          setLoading(false);
         });
-     }
+      })
+      .catch(() => {
+        removeToken();
+        setIsAuthenticated(false);
+        setLoading(false);
+      });
   }, []);
 
   const handleLogin = (loggedUser) => {
     setUser(loggedUser);
     setIsAuthenticated(true);
     setCurrentView('overview');
+
+    // Try to load persisted data from localStorage
+    const cached = loadDataFromStorage();
+    if (cached && cached.length > 0) {
+      setData(cached);
+      return;
+    }
+
+    // Otherwise try backend
+    setLoading(true);
+    setLoadMsg('Fetching Intelligence Data...');
+    Promise.all([
+      api.getStats().catch(() => null),
+      api.getResults(1, 100).catch(() => null)
+    ]).then(([statsRes, resultsRes]) => {
+      if (statsRes) setStats(statsRes);
+      const apiData = resultsRes?.data || [];
+      if (apiData.length > 0) {
+        const normalized = apiData.map(normalizeRow);
+        setData(normalized);
+        saveDataToStorage(normalized);
+      }
+      setLoading(false);
+    });
   };
 
   const handleLogout = () => {
     removeToken();
+    clearDataFromStorage();
     setIsAuthenticated(false);
     setUser(null);
+    setData([]);
+    setStats(null);
   };
 
-  // Shared generic CSV parser
+  // Shared generic CSV parser (local processing + localStorage persistence)
   const processCSV = useCallback((file) => {
-    setLoading(true); setProgress(0); setLoadMsg('Parsing CSV…');
+    setLoading(true); setProgress(0); setLoadMsg('Parsing CSV...');
     Papa.parse(file, {
       header: true, skipEmptyLines: true,
       complete: (result) => {
         const rows = result.data;
-        setLoadMsg(`Processing ${rows.length.toLocaleString()} containers…`);
+        setLoadMsg(`Processing ${rows.length.toLocaleString()} containers...`);
         let idx = 0; const scored = []; const batch = Math.max(1, Math.floor(rows.length / 50));
         const process = () => {
           const end = Math.min(idx + batch, rows.length);
           for (; idx < end; idx++) scored.push(computeMockRisk(rows[idx]));
           setProgress(Math.floor((idx / rows.length) * 100));
-          setLoadMsg(`Scoring container ${idx.toLocaleString()} of ${rows.length.toLocaleString()}…`);
+          setLoadMsg(`Scoring container ${idx.toLocaleString()} of ${rows.length.toLocaleString()}...`);
           if (idx < rows.length) requestAnimationFrame(process);
           else {
             setTimeout(() => {
               setData(scored);
+              saveDataToStorage(scored); // Persist to localStorage!
               setLoading(false);
               setCurrentView('overview'); // redirect to overview on success
             }, 600);
@@ -173,7 +248,7 @@ export default function App() {
   // Determine current page component
   let ViewComponent;
   switch (currentView) {
-    case 'overview': ViewComponent = <Overview data={data} />; break; // stats can be added here if needed
+    case 'overview': ViewComponent = <Overview data={data} />; break;
     case 'containers': ViewComponent = <Containers data={data} />; break;
     case 'analytics': ViewComponent = <Analytics data={data} />; break;
     case 'upload': ViewComponent = <UploadData onFileLoaded={processCSV} />; break;
