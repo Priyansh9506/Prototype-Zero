@@ -28,7 +28,7 @@ By intelligently parsing manifest data, dwelling times, declared weights vs. act
 - 🔥 **Real-time Anomaly Detection**: Statistical anomaly flagging using AI/ML algorithms.
 - 👨‍⚖️ **Role-Based Access Control (RBAC)**: Distinct permissions for `Admin`, `Officer`, and `Pending` users.
 - 📊 **Dynamic Analytics Dashboard**: Rich data visualizations built with Recharts.
-- ⚡ **Asynchronous Processing**: Celery & Redis backed task queuing for heavy ML inference workloads.
+- 💨 **In-Process Background Tasks**: Fast execution of ML inference without external brokers.
 - 🛡️ **JWT Authentication**: Secure, token-based API communication.
 
 ---
@@ -42,26 +42,23 @@ graph TD
     %% Styling
     classDef frontend fill:#C06820,stroke:#8B4513,stroke-width:2px,color:#fff,font-weight:bold
     classDef backend fill:#2E7D32,stroke:#1B5E20,stroke-width:2px,color:#fff,font-weight:bold
-    classDef worker fill:#1565C0,stroke:#0D47A1,stroke-width:2px,color:#fff,font-weight:bold
     classDef memory fill:#C62828,stroke:#b71c1c,stroke-width:2px,color:#fff,font-weight:bold
     classDef db fill:#455A64,stroke:#263238,stroke-width:2px,color:#fff,font-weight:bold
 
     %% Nodes
     Client["💻 Next.js Dashboard<br/>(Client UI)"]:::frontend
-    API["⚡ FastAPI Server<br/>(Core API Layer)"]:::backend
+    API["⚡ FastAPI Server<br/>(Core API)"]:::backend
     Auth["🔐 JWT Auth Layer"]:::backend
-    Celery["⚙️ Celery Workers<br/>(ML Inference)"]:::worker
-    Redis["🔴 Redis<br/>(Message Broker)"]:::memory
-    Postgres["🐘 SQLite / PostgreSQL<br/>(Persistent Data)"]:::db
+    ML_Task["⚙️ ML Pipeline<br/>(Background Task)"]:::backend
+    Postgres["🐘 SQLite<br/>(Persistent Data)"]:::db
 
     %% Connections
-    Client -- "REST API / JSON" --> API
+    Client -- "REST API" --> API
     API -- "Authentication" --> Auth
     Auth -- "Validates User" --> Postgres
 
-    API -- "Queues Manifests" --> Redis
-    Redis -- "Dispatches Tasks" --> Celery
-    Celery -- "Updates Risk Scores" --> Postgres
+    API -- "Spawns Inference" --> ML_Task
+    ML_Task -- "Predicts Risk" --> Postgres
     API -- "Reads Results" --> Postgres
 ```
 
@@ -121,7 +118,6 @@ _Detailed triage view featuring the dynamic `RiskBar` component with deep ML sco
 
 - Python 3.9+
 - Node.js 18+
-- Redis Server (Native or Docker)
 
 ### Installation
 

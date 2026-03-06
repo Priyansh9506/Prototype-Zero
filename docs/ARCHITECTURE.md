@@ -6,29 +6,30 @@
 flowchart TD
     User["USER / JUDGE<br>(Browser / API Client)"]
 
-    subgraph Frontend["Next.js Frontend (Vercel Deployed)"]
+    subgraph Frontend["Next.js Frontend"]
         direction TB
         F_Pages["Dashboard Page<br>Upload Page<br>Container Detail<br>Analytics Page"]
-        F_API["Next.js API<br>Routes (Proxy)"]
+        F_API["API Client<br>(JWT Auth)"]
         F_Pages --- F_API
     end
 
-    subgraph Backend["FastAPI Backend (Railway Deployed)"]
+    subgraph Backend["FastAPI Backend"]
         direction TB
         B_Routes["/stats<br>/results<br>/container/{id}<br>/predict (upload)"]
+        B_Tasks["In-Memory Task Manager<br>(BackgroundTasks)"]
+        B_Routes --- B_Tasks
     end
 
     subgraph ML_Pipeline["ML Pipeline"]
         direction TB
         L["Data Loader"] --> P["Preprocessor"]
-        P --> F["Feature Engineering<br>(40+ feats)"]
-        F --> E["Ensemble<br>XGBoost (40%)<br>LightGBM (35%)<br>Anomaly (25%)"]
-        E --> S["Explainability<br>SHAP + Rules"]
-        S --> O["Output<br>CSV + JSON"]
+        P --> F["Feature Engineering"]
+        F --> E["Ensemble Model"]
+        E --> S["SHAP Explainability"]
     end
 
     User --> Frontend
-    Frontend -- "HTTP/REST" --> Backend
+    Frontend -- "REST API" --> Backend
     Backend --> ML_Pipeline
 ```
 

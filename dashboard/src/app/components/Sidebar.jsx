@@ -27,7 +27,7 @@ export default function Sidebar({ currentView, setView, onLogout, userId }) {
                 <Anchor size={28} color="#C06820" strokeWidth={2.5} />
                 <div>
                     <div style={{ fontFamily: 'Quicksand', fontSize: 15, fontWeight: 700, color: '#2C2418', letterSpacing: 0.5 }}>Risk Engine</div>
-                    <div style={{ fontFamily: 'Quicksand', fontSize: 11, color: '#C06820', fontWeight: 600 }}>v4.0 — CUSTOMS</div>
+                    <div style={{ fontFamily: 'Quicksand', fontSize: 11, color: '#C06820', fontWeight: 600 }}>v4.0 - CUSTOMS</div>
                 </div>
             </div>
 
