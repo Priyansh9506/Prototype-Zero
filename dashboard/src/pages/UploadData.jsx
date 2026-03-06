@@ -19,8 +19,8 @@ export default function UploadData({ onFileLoaded }) {
 
     return (
         <div style={{ animation: 'fadeInUp 0.4s ease-out', maxWidth: 800, margin: '0 auto' }}>
-            <h2 style={{ fontFamily: 'Quicksand', fontSize: 22, color: '#2C2418', marginBottom: 8, fontWeight: 700, letterSpacing: 1 }}>MANIFEST UPLOAD</h2>
-            <p style={{ color: '#7A6E5D', fontSize: 15, marginBottom: 32, fontWeight: 500 }}>Upload container shipment manifest data (CSV format) for real-time risk scoring and anomaly detection.</p>
+            <h2 style={{ fontFamily: 'Quicksand', fontSize: 22, color: '#2C2418', marginBottom: 8, fontWeight: 700, letterSpacing: 1 }}>UPLOAD DATA</h2>
+            <p style={{ color: '#7A6E5D', fontSize: 15, marginBottom: 32, fontWeight: 500 }}>Upload container shipment data (CSV format) for real-time risk scoring and anomaly detection.</p>
 
             <div
                 onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -39,7 +39,7 @@ export default function UploadData({ onFileLoaded }) {
                 <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(192,104,32,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
                     <Upload size={40} color="#C06820" />
                 </div>
-                <h3 style={{ fontFamily: 'Quicksand', fontSize: 20, color: '#2C2418', marginBottom: 12, fontWeight: 700 }}>Drag & Drop Manifest CSV</h3>
+                <h3 style={{ fontFamily: 'Quicksand', fontSize: 20, color: '#2C2418', marginBottom: 12, fontWeight: 700 }}>Drag & Drop CSV</h3>
                 <p style={{ color: '#7A6E5D', fontSize: 15, marginBottom: 24, fontWeight: 500 }}>or click to browse your local file system</p>
                 <input ref={fileRef} type="file" accept=".csv" hidden onChange={handleChange} />
 
