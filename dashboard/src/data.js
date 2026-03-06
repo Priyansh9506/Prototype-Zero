@@ -49,13 +49,14 @@ export function computeMockRisk(row) {
 }
 
 export function getRiskColor(level) {
-  if (level === 'Critical') return '#FF3B30';
-  if (level === 'Medium Risk') return '#FF9500';
-  return '#30D158';
+  if (level === 'Critical') return '#C62828';
+  if (level === 'Medium Risk') return '#E65100';
+  return '#2E7D32';
 }
 
 export function getRiskGlow(level) {
-  if (level === 'Critical') return 'rgba(255,59,48,0.15)';
-  if (level === 'Medium Risk') return 'rgba(255,149,0,0.15)';
-  return 'rgba(48,209,88,0.15)';
+  if (level === 'Critical') return 'rgba(198,40,40,0.06)';
+  if (level === 'Medium Risk') return 'rgba(230,81,0,0.06)';
+  return 'rgba(46,125,50,0.06)';
 }
+

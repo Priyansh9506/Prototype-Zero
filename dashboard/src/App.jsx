@@ -13,25 +13,26 @@ import Sidebar from './pages/Sidebar';
 import Overview from './pages/Overview';
 import UploadData from './pages/UploadData';
 import Containers from './pages/Containers';
+import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 
 /* ─── Loading Overlay ─── */
 function LoadingOverlay({ progress, message }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(10,14,26,0.92)', backdropFilter: 'blur(12px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(245,240,232,0.95)', backdropFilter: 'blur(12px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ position: 'relative', width: 120, height: 120, marginBottom: 32 }}>
-        <div style={{ position: 'absolute', inset: 0, border: '2px solid #1E2D45', borderRadius: '50%' }} />
-        <div style={{ position: 'absolute', inset: 0, border: '2px solid transparent', borderTop: '2px solid #00D4FF', borderRadius: '50%', animation: 'radarSpin 1.5s linear infinite' }} />
-        <div style={{ position: 'absolute', inset: 15, border: '1px solid #1E2D45', borderRadius: '50%' }} />
-        <div style={{ position: 'absolute', inset: 15, border: '2px solid transparent', borderTop: '2px solid #FF3B30', borderRadius: '50%', animation: 'radarSpin 2s linear infinite reverse' }} />
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Orbitron', fontSize: 18, fontWeight: 700, color: '#00D4FF' }}>
+        <div style={{ position: 'absolute', inset: 0, border: '2px solid #D9CDBA', borderRadius: '50%' }} />
+        <div style={{ position: 'absolute', inset: 0, border: '2px solid transparent', borderTop: '2px solid #C06820', borderRadius: '50%', animation: 'radarSpin 1.5s linear infinite' }} />
+        <div style={{ position: 'absolute', inset: 15, border: '1px solid #D9CDBA', borderRadius: '50%' }} />
+        <div style={{ position: 'absolute', inset: 15, border: '2px solid transparent', borderTop: '2px solid #C62828', borderRadius: '50%', animation: 'radarSpin 2s linear infinite reverse' }} />
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Quicksand', fontSize: 18, fontWeight: 700, color: '#C06820' }}>
           {progress}%
         </div>
       </div>
-      <div style={{ fontFamily: 'Orbitron', fontSize: 14, color: '#00D4FF', letterSpacing: 3, marginBottom: 8 }}>ANALYSING</div>
-      <div style={{ fontSize: 12, color: '#8B9AB5' }}>{message}</div>
-      <div style={{ width: 280, height: 4, background: '#1E2D45', borderRadius: 2, marginTop: 20, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg, #0094B3, #00D4FF)', transition: 'width 0.3s', borderRadius: 2 }} />
+      <div style={{ fontFamily: 'Quicksand', fontSize: 14, color: '#C06820', letterSpacing: 3, marginBottom: 8, fontWeight: 700 }}>SCANNING MANIFEST</div>
+      <div style={{ fontSize: 13, color: '#7A6E5D', fontWeight: 500 }}>{message}</div>
+      <div style={{ width: 280, height: 4, background: '#EDE7DB', borderRadius: 2, marginTop: 20, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg, #A85818, #C06820)', transition: 'width 0.3s', borderRadius: 2 }} />
       </div>
     </div>
   );
@@ -43,6 +44,20 @@ export default function App() {
 
   const [currentView, setCurrentView] = useState('overview');
   const [data, setData] = useState(SAMPLE_DATA);
+  const [criticalThreshold, setCriticalThreshold] = useState(0.5);
+
+  // Reclassify containers when threshold changes
+  const handleThresholdChange = useCallback((newThreshold) => {
+    setCriticalThreshold(newThreshold);
+    setData(prev => prev.map(row => {
+      const score = row.Risk_Score;
+      let level;
+      if (score >= newThreshold) level = 'Critical';
+      else if (score >= newThreshold * 0.5) level = 'Medium Risk';
+      else level = 'Low Risk';
+      return { ...row, Risk_Level: level };
+    }));
+  }, []);
 
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -101,13 +116,14 @@ export default function App() {
   switch (currentView) {
     case 'overview': ViewComponent = <Overview data={data} />; break;
     case 'containers': ViewComponent = <Containers data={data} />; break;
+    case 'analytics': ViewComponent = <Analytics data={data} />; break;
     case 'upload': ViewComponent = <UploadData onFileLoaded={processCSV} />; break;
-    case 'settings': ViewComponent = <Settings />; break;
+    case 'settings': ViewComponent = <Settings threshold={criticalThreshold} onThresholdChange={handleThresholdChange} />; break;
     default: ViewComponent = <Overview data={data} />;
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#F5F0E8' }}>
       {loading && <LoadingOverlay progress={progress} message={loadMsg} />}
 
       <Sidebar currentView={currentView} setView={setCurrentView} onLogout={handleLogout} userId={userId} />
@@ -116,19 +132,19 @@ export default function App() {
         {/* Top Header */}
         <header style={{
           display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
-          padding: '16px 32px', borderBottom: '1px solid #1E2D45',
-          background: 'rgba(15,22,40,0.8)', backdropFilter: 'blur(10px)',
+          padding: '16px 32px', borderBottom: '1px solid #D9CDBA',
+          background: 'rgba(255,253,248,0.9)', backdropFilter: 'blur(10px)',
           position: 'sticky', top: 0, zIndex: 100, height: 60
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#30D158', animation: 'glow-green 2s infinite' }} />
-              <span style={{ fontFamily: 'Orbitron', fontSize: 10, color: '#30D158', letterSpacing: 2 }}>NODE ACTIVE</span>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#2E7D32', animation: 'glow-green 2s infinite' }} />
+              <span style={{ fontFamily: 'Quicksand', fontSize: 11, color: '#2E7D32', letterSpacing: 2, fontWeight: 700 }}>SYSTEM ACTIVE</span>
             </div>
-            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 11, color: '#8B9AB5' }}>
+            <span style={{ fontFamily: 'Quicksand', fontSize: 12, color: '#7A6E5D', fontWeight: 500 }}>
               {clock.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} {clock.toLocaleTimeString('en-GB')}
             </span>
-            <span style={{ fontFamily: 'Orbitron', fontSize: 9, color: '#0A0E1A', background: '#00D4FF', borderRadius: 4, padding: '3px 8px', letterSpacing: 1, fontWeight: 700 }}>VERIFIED</span>
+            <span style={{ fontFamily: 'Quicksand', fontSize: 10, color: '#FFFFFF', background: '#C06820', borderRadius: 4, padding: '3px 8px', letterSpacing: 1, fontWeight: 800 }}>CUSTOMS</span>
           </div>
         </header>
 

@@ -635,6 +635,131 @@ print(f"  ✅ Risk_Predictions.csv")
 print(f"  ✅ CV_and_Test_Metrics.csv")
 print(f"  ✅ Best_Hyperparams.csv")
 
+# ─── REAL-TIME GROUND TRUTH EVALUATION ───────────────────────────────────────
+# The Real-Time CSV has Clearance_Status labels — use them to measure
+# true prediction accuracy on completely unseen organiser-provided data.
+print("\n" + "─" * 70)
+print("  REAL-TIME GROUND TRUTH EVALUATION")
+print("  (Comparing predictions vs actual Clearance_Status in Real-Time CSV)")
+print("─" * 70)
+
+rt_actual_raw  = rt_df[TARGET_COL].map(LABEL_MAP)
+rt_actual_valid = rt_actual_raw.dropna()
+valid_idx       = rt_actual_valid.index
+
+# Get predicted class from hybrid risk score for valid rows
+rt_pred_3class = np.where(
+    rt_risk_score[valid_idx] >= best_crit_thresh, 2,
+    np.where(rt_risk_score[valid_idx] >= best_med_thresh, 1, 0)
+).astype(int)
+
+rt_actual_arr = rt_actual_valid.values.astype(int)
+
+# Binary metrics (Critical vs non-Critical)
+rt_actual_bin  = (rt_actual_arr == 2).astype(int)
+rt_pred_bin    = (rt_pred_3class == 2).astype(int)
+rt_crit_prob_v = xgb_rt_prob[valid_idx, 2]
+
+rt_gt_acc    = accuracy_score(rt_actual_arr, rt_pred_3class)
+rt_gt_prec   = precision_score(rt_actual_bin, rt_pred_bin, zero_division=0)
+rt_gt_rec    = recall_score(rt_actual_bin, rt_pred_bin, zero_division=0)
+rt_gt_f1     = f1_score(rt_actual_bin, rt_pred_bin, zero_division=0)
+rt_gt_macro  = f1_score(rt_actual_arr, rt_pred_3class, average="macro", zero_division=0)
+rt_gt_auc    = roc_auc_score(rt_actual_bin, rt_crit_prob_v)
+
+print(f"\n  ┌──────────────────────────────────────────────┐")
+print(f"  │   REAL-TIME DATA — GROUND TRUTH RESULTS      │")
+print(f"  │   Trained on: 100% Historical (54,000 rows)  │")
+print(f"  │   Tested on : Real-Time CSV  ( 8,481 rows)   │")
+print(f"  ├──────────────────────────────────────────────┤")
+print(f"  │  Accuracy      : {rt_gt_acc:.4f}                   │")
+print(f"  │  Precision     : {rt_gt_prec:.4f}                   │")
+print(f"  │  Recall        : {rt_gt_rec:.4f}                   │")
+print(f"  │  F1 (Critical) : {rt_gt_f1:.4f}                   │")
+print(f"  │  Macro F1      : {rt_gt_macro:.4f}                   │")
+print(f"  │  AUC-ROC       : {rt_gt_auc:.4f}                   │")
+print(f"  └──────────────────────────────────────────────┘")
+
+print("\n  Per-Class Report — Real-Time Ground Truth:")
+print(classification_report(
+    rt_actual_arr, rt_pred_3class,
+    target_names=["Clear", "Low Risk", "Critical"],
+    zero_division=0,
+))
+
+# Confusion matrix for real-time
+rt_gt_cm = confusion_matrix(rt_actual_arr, rt_pred_3class)
+print("  Confusion Matrix (Real-Time):")
+print(f"  {'':15s} {'Pred:Clear':>12} {'Pred:LowRisk':>12} {'Pred:Critical':>14}")
+for i, row_label in enumerate(["True:Clear", "True:LowRisk", "True:Critical"]):
+    row_vals = "  ".join([f"{v:>10,}" for v in rt_gt_cm[i]])
+    print(f"  {row_label:15s}  {row_vals}")
+
+# Add RT ground truth metrics to the metrics CSV
+rt_gt_row = {
+    "fold":        "REALTIME_GROUNDTRUTH",
+    "accuracy":    rt_gt_acc,
+    "precision":   rt_gt_prec,
+    "recall":      rt_gt_rec,
+    "f1_critical": rt_gt_f1,
+    "macro_f1":    rt_gt_macro,
+    "auc":         rt_gt_auc,
+}
+metrics_rows_full = metrics_rows + [rt_gt_row]
+pd.DataFrame(metrics_rows_full).to_csv(
+    os.path.join(OUTPUT_DIR, "CV_and_Test_Metrics.csv"), index=False
+)
+print(f"\n  ✅ Real-Time ground truth metrics appended to CV_and_Test_Metrics.csv")
+
+# ── Visualisation: 3-way metrics comparison (CV / 30% Test / Real-Time GT) ───
+fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+
+all_rows_3way = fold_metrics + [
+    {"fold": "Test 30%",  "accuracy": test_acc,   "precision": test_prec,
+     "recall": test_rec,  "f1_critical": test_f1,  "macro_f1": test_macro, "auc": test_auc},
+    {"fold": "RT Ground\nTruth", "accuracy": rt_gt_acc, "precision": rt_gt_prec,
+     "recall": rt_gt_rec, "f1_critical": rt_gt_f1, "macro_f1": rt_gt_macro, "auc": rt_gt_auc},
+]
+bar_colors_3  = ["#5D9CEC"] * len(fold_metrics) + ["#E74C3C", "#27AE60"]
+fold_labels_3 = [f"Fold {m['fold']}" for m in fold_metrics] + ["Test 30%", "RT Ground\nTruth"]
+metrics_plot3 = [
+    ("f1_critical", "F1 Score — Critical Class"),
+    ("macro_f1",    "Macro F1 Score"),
+    ("auc",         "AUC-ROC — Critical"),
+]
+for ax, (metric, title) in zip(axes, metrics_plot3):
+    vals  = [m[metric] for m in all_rows_3way]
+    bars  = ax.bar(fold_labels_3, vals, color=bar_colors_3, edgecolor="#2C3E50")
+    # annotate bars
+    for bar, val in zip(bars, vals):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.003,
+                f"{val:.4f}", ha="center", va="bottom", fontsize=7.5,
+                color="#2C3E50", fontweight="bold")
+    ax.axhline(np.mean(vals[:len(fold_metrics)]), color="black",
+               ls="--", lw=1.5, label=f"CV Mean={np.mean(vals[:len(fold_metrics)]):.4f}")
+    ax.set_title(title, fontsize=12, fontweight="bold")
+    ax.set_ylim(max(0, min(vals) - 0.08), 1.04)
+    ax.tick_params(axis="x", rotation=15)
+    ax.legend(fontsize=8)
+    ax.spines[["top","right"]].set_visible(False)
+
+# Colour legend
+from matplotlib.patches import Patch
+legend_elements = [
+    Patch(facecolor="#5D9CEC", label="CV Folds (train)"),
+    Patch(facecolor="#E74C3C", label="Held-Out Test 30%"),
+    Patch(facecolor="#27AE60", label="Real-Time Ground Truth"),
+]
+fig.legend(handles=legend_elements, loc="lower center", ncol=3,
+           fontsize=10, frameon=False, bbox_to_anchor=(0.5, -0.04))
+plt.suptitle("Full Evaluation: CV → Held-Out Test → Real-Time Ground Truth",
+             fontsize=14, fontweight="bold")
+plt.tight_layout()
+fig.savefig(os.path.join(OUTPUT_DIR, "cv_test_rt_comparison.png"),
+            dpi=150, bbox_inches="tight")
+plt.close(fig)
+print(f"  ✅ cv_test_rt_comparison.png saved")
+
 # ─── VISUALISATIONS ──────────────────────────────────────────────────────────
 PALETTE = {"Critical": "#E74C3C", "Medium Risk": "#F39C12", "Low Risk": "#27AE60"}
 
@@ -781,6 +906,15 @@ print(f"""
   F1 Critical   : {test_f1:.4f}
   Macro F1      : {test_macro:.4f}
   AUC-ROC       : {test_auc:.4f}
+
+  Real-Time Ground Truth — Organiser Test Set
+  ─────────────────────────────────────────────
+  Accuracy      : {rt_gt_acc:.4f}
+  Precision     : {rt_gt_prec:.4f}
+  Recall        : {rt_gt_rec:.4f}
+  F1 Critical   : {rt_gt_f1:.4f}
+  Macro F1      : {rt_gt_macro:.4f}
+  AUC-ROC       : {rt_gt_auc:.4f}
 
   Real-Time Predictions
   ──────────────────────

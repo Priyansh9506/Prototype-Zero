@@ -1,10 +1,11 @@
 import React from 'react';
-import { Hexagon, LayoutDashboard, Database, List, Settings, LogOut } from 'lucide-react';
+import { Anchor, LayoutDashboard, Database, List, Settings, LogOut, BarChart3 } from 'lucide-react';
 
 export default function Sidebar({ currentView, setView, onLogout, userId }) {
     const menuItems = [
         { id: 'overview', label: 'OVERVIEW', icon: <LayoutDashboard size={18} /> },
         { id: 'containers', label: 'CONTAINERS', icon: <List size={18} /> },
+        { id: 'analytics', label: 'ANALYTICS', icon: <BarChart3 size={18} /> },
         { id: 'upload', label: 'DATA UPLOAD', icon: <Database size={18} /> },
         { id: 'settings', label: 'SETTINGS', icon: <Settings size={18} /> },
     ];
@@ -12,9 +13,8 @@ export default function Sidebar({ currentView, setView, onLogout, userId }) {
     return (
         <div style={{
             width: 260,
-            background: 'rgba(15,22,40,0.95)',
-            backdropFilter: 'blur(10px)',
-            borderRight: '1px solid #1E2D45',
+            background: '#FFFDF8',
+            borderRight: '1px solid #D9CDBA',
             display: 'flex',
             flexDirection: 'column',
             height: '100vh',
@@ -22,29 +22,29 @@ export default function Sidebar({ currentView, setView, onLogout, userId }) {
             top: 0
         }}>
             {/* Brand */}
-            <div style={{ padding: '24px 24px 32px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(30,45,69,0.5)' }}>
-                <Hexagon size={28} color="#00D4FF" strokeWidth={2.5} />
+            <div style={{ padding: '24px 24px 32px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid #EDE7DB' }}>
+                <Anchor size={28} color="#C06820" strokeWidth={2.5} />
                 <div>
-                    <div style={{ fontFamily: 'Orbitron', fontSize: 14, fontWeight: 700, color: '#E8EDF5', letterSpacing: 0.5 }}>Risk Engine</div>
-                    <div style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: '#00D4FF' }}>v4.0.0-PROD</div>
+                    <div style={{ fontFamily: 'Quicksand', fontSize: 15, fontWeight: 700, color: '#2C2418', letterSpacing: 0.5 }}>Risk Engine</div>
+                    <div style={{ fontFamily: 'Quicksand', fontSize: 11, color: '#C06820', fontWeight: 600 }}>v4.0 — CUSTOMS</div>
                 </div>
             </div>
 
             {/* User Info */}
             <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontFamily: 'Orbitron', fontSize: 10, color: '#8B9AB5', letterSpacing: 2 }}>CURRENT SESSION</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#0A0E1A', padding: '12px', borderRadius: 8, border: '1px solid #1E2D45' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#30D158', animation: 'glow-green 2s infinite' }} />
+                <div style={{ fontFamily: 'Quicksand', fontSize: 11, color: '#7A6E5D', letterSpacing: 2, fontWeight: 700 }}>ACTIVE OFFICER</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#F5F0E8', padding: '12px', borderRadius: 8, border: '1px solid #EDE7DB' }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#2E7D32', animation: 'glow-green 2s infinite' }} />
                     <div style={{ flex: 1 }}>
-                        <div style={{ fontFamily: 'JetBrains Mono', fontSize: 12, fontWeight: 600, color: '#E8EDF5' }}>{userId || 'OFFICER_XYZ'}</div>
-                        <div style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: '#8B9AB5' }}>Clearance: LEVEL 4</div>
+                        <div style={{ fontFamily: 'Quicksand', fontSize: 13, fontWeight: 700, color: '#2C2418' }}>{userId || 'OFFICER_XYZ'}</div>
+                        <div style={{ fontFamily: 'Quicksand', fontSize: 11, color: '#7A6E5D', fontWeight: 500 }}>Clearance: LEVEL 4</div>
                     </div>
                 </div>
             </div>
 
             {/* Navigation */}
             <nav style={{ flex: 1, padding: '0 16px', marginTop: 16 }}>
-                <div style={{ fontFamily: 'Orbitron', fontSize: 10, color: '#8B9AB5', letterSpacing: 2, marginBottom: 16, paddingLeft: 8 }}>NAVIGATION</div>
+                <div style={{ fontFamily: 'Quicksand', fontSize: 11, color: '#7A6E5D', letterSpacing: 2, marginBottom: 16, paddingLeft: 8, fontWeight: 700 }}>NAVIGATION</div>
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {menuItems.map(item => {
                         const isActive = currentView === item.id;
@@ -55,26 +55,26 @@ export default function Sidebar({ currentView, setView, onLogout, userId }) {
                                     style={{
                                         width: '100%', display: 'flex', alignItems: 'center', gap: 12,
                                         padding: '12px 16px', borderRadius: 8, cursor: 'pointer',
-                                        background: isActive ? 'rgba(0,212,255,0.1)' : 'transparent',
-                                        border: `1px solid ${isActive ? 'rgba(0,212,255,0.3)' : 'transparent'}`,
-                                        color: isActive ? '#00D4FF' : '#8B9AB5',
-                                        fontFamily: 'Orbitron', fontSize: 12, letterSpacing: 1, fontWeight: isActive ? 600 : 400,
+                                        background: isActive ? 'rgba(192,104,32,0.08)' : 'transparent',
+                                        border: `1px solid ${isActive ? 'rgba(192,104,32,0.2)' : 'transparent'}`,
+                                        color: isActive ? '#C06820' : '#7A6E5D',
+                                        fontFamily: 'Quicksand', fontSize: 13, letterSpacing: 1, fontWeight: isActive ? 700 : 500,
                                         textAlign: 'left', transition: 'all 0.2s', position: 'relative', overflow: 'hidden'
                                     }}
                                     onMouseEnter={(e) => {
                                         if (!isActive) {
-                                            e.currentTarget.style.color = '#E8EDF5';
-                                            e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                                            e.currentTarget.style.color = '#2C2418';
+                                            e.currentTarget.style.background = 'rgba(44,36,24,0.03)';
                                         }
                                     }}
                                     onMouseLeave={(e) => {
                                         if (!isActive) {
-                                            e.currentTarget.style.color = '#8B9AB5';
+                                            e.currentTarget.style.color = '#7A6E5D';
                                             e.currentTarget.style.background = 'transparent';
                                         }
                                     }}
                                 >
-                                    {isActive && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: '#00D4FF', boxShadow: '0 0 10px #00D4FF' }} />}
+                                    {isActive && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: '#C06820' }} />}
                                     {item.icon}
                                     {item.label}
                                 </button>
@@ -91,18 +91,18 @@ export default function Sidebar({ currentView, setView, onLogout, userId }) {
                     style={{
                         width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                         padding: '12px', borderRadius: 8, cursor: 'pointer',
-                        background: 'transparent', border: '1px solid #1E2D45',
-                        color: '#8B9AB5', fontFamily: 'Orbitron', fontSize: 11, letterSpacing: 1,
+                        background: 'transparent', border: '1px solid #D9CDBA',
+                        color: '#7A6E5D', fontFamily: 'Quicksand', fontSize: 12, letterSpacing: 1, fontWeight: 600,
                         transition: 'all 0.2s'
                     }}
                     onMouseEnter={(e) => {
-                        e.currentTarget.style.color = '#FF3B30';
-                        e.currentTarget.style.borderColor = 'rgba(255,59,48,0.4)';
-                        e.currentTarget.style.background = 'rgba(255,59,48,0.05)';
+                        e.currentTarget.style.color = '#C62828';
+                        e.currentTarget.style.borderColor = 'rgba(198,40,40,0.35)';
+                        e.currentTarget.style.background = 'rgba(198,40,40,0.04)';
                     }}
                     onMouseLeave={(e) => {
-                        e.currentTarget.style.color = '#8B9AB5';
-                        e.currentTarget.style.borderColor = '#1E2D45';
+                        e.currentTarget.style.color = '#7A6E5D';
+                        e.currentTarget.style.borderColor = '#D9CDBA';
                         e.currentTarget.style.background = 'transparent';
                     }}
                 >
