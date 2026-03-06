@@ -139,6 +139,95 @@ async def read_users_me(current_user: models_db.User = Depends(auth.get_current_
     return current_user
 
 
+@app.get("/users", response_model=list[schemas.UserResponse])
+def read_users(
+    skip: int = 0, limit: int = 100, 
+    db: Session = Depends(get_db), 
+    current_user: models_db.User = Depends(auth.get_current_admin)
+):
+    users = db.query(models_db.User).offset(skip).limit(limit).all()
+    return users
+
+
+@app.post("/admin/users", response_model=schemas.UserResponse)
+def admin_create_user(
+    user: schemas.UserCreate,
+    role: str = Query("officer", description="Role to assign: officer, admin, or pending"),
+    db: Session = Depends(get_db),
+    current_user: models_db.User = Depends(auth.get_current_admin)
+):
+    """Admin creates a new user with a specified role."""
+    db_user = auth.get_user_by_username(db, username=user.username)
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    
+    if role not in [r.value for r in models_db.UserRole]:
+        raise HTTPException(status_code=400, detail="Invalid role specified")
+    
+    hashed_password = auth.get_password_hash(user.password)
+    db_user = models_db.User(
+        username=user.username,
+        email=user.email,
+        hashed_password=hashed_password,
+        role=role
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+@app.put("/admin/users/{user_id}", response_model=schemas.UserResponse)
+def admin_update_user(
+    user_id: int,
+    username: str = Query(None),
+    email: str = Query(None),
+    password: str = Query(None),
+    role: str = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models_db.User = Depends(auth.get_current_admin)
+):
+    """Admin updates a user's credentials or role."""
+    user = db.query(models_db.User).filter(models_db.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if username:
+        existing = auth.get_user_by_username(db, username=username)
+        if existing and existing.id != user_id:
+            raise HTTPException(status_code=400, detail="Username already taken")
+        user.username = username
+    if email:
+        user.email = email
+    if password:
+        user.hashed_password = auth.get_password_hash(password)
+    if role:
+        if role not in [r.value for r in models_db.UserRole]:
+            raise HTTPException(status_code=400, detail="Invalid role specified")
+        user.role = role
+    
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.delete("/admin/users/{user_id}")
+def admin_delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: models_db.User = Depends(auth.get_current_admin)
+):
+    """Admin deletes a user."""
+    user = db.query(models_db.User).filter(models_db.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    
+    db.delete(user)
+    db.commit()
+    return {"detail": f"User {user_id} deleted successfully"}
+
 # ---- API Endpoints ----
 
 @app.get("/")
