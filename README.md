@@ -135,14 +135,16 @@ python -m venv venv
 source venv/bin/activate  # Or `venv\Scripts\activate` on Windows
 pip install -r requirements.txt
 python verify_user.py      # Seed the admin database
-python -m uvicorn api.main:app --reload
+
+# Start with isolated watcher to avoid frontend compilation loops
+python -m uvicorn api.main:app --reload --reload-dir api --reload-dir src --port 8000
 ```
 
 **3. Setup Frontend (Next.js)**
 
 ```bash
 cd dashboard
-npm install
+npm install --force       # Use --force if you encounter permission (EPERM) issues
 npm run dev
 ```
 
@@ -150,6 +152,26 @@ npm run dev
 Navigate your browser to `http://localhost:3000`.
 
 ---
+
+## 🛠️ Troubleshooting
+
+### Windows Compilation Loop
+
+If you find the backend restarting infinitely when the frontend compiles, ensure you are running the backend with `--reload-dir api --reload-dir src`. This prevents Uvicorn from watching the `.next` build folder.
+
+### Missing Dependencies
+
+If you encounter `Module not found` in the frontend terminal, try clearing the cache and reinstalling:
+
+```bash
+rmdir /S /Q .next
+npm install --force
+npm run dev
+```
+
+### SHAP Installation
+
+The `shap` library is optional and may fail to install on some Windows environments with Python 3.13. The system is designed to skip SHAP explanations gracefully if the package is missing.
 
 <div align="center">
   <sub>Built with precision for global supply chain security.</sub>

@@ -346,6 +346,10 @@ function computeMockRisk(row) {
     const explanation = `${icons[level]} ${level} (score=${score.toFixed(3)}) | Drivers: ${reasonText}. Weight Δ=${discPct.toFixed(1)}%, value/kg=${vpk.toFixed(2)}.${anomaly ? ' Isolation Forest flagged as statistical anomaly.' : ''}`;
     return {
         ...row,
+        Declared_Weight: dw,
+        Measured_Weight: mw,
+        Declared_Value: dv,
+        Dwell_Time_Hours: dt,
         Risk_Score: parseFloat(score.toFixed(4)),
         Risk_Level: level,
         Anomaly_Flag: anomaly,
@@ -396,10 +400,17 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$auth$2e$js__$5
 const API_BASE_URL = 'http://localhost:8000';
 async function fetchWithAuth(url, options = {}) {
     const token = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$auth$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getToken"])();
+    const isFormData = options.body instanceof FormData;
     const headers = {
-        'Content-Type': 'application/json',
+        ...isFormData ? {} : {
+            'Content-Type': 'application/json'
+        },
         ...options.headers
     };
+    // Remove any explicitly undefined headers (safety net)
+    Object.keys(headers).forEach((k)=>{
+        if (headers[k] === undefined) delete headers[k];
+    });
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
     }
@@ -445,6 +456,15 @@ const api = {
         if (search) params.append('search', search);
         return fetchWithAuth(`/results?${params.toString()}`);
     },
+    predictBatch: (file)=>{
+        const formData = new FormData();
+        formData.append('file', file);
+        return fetchWithAuth('/predict/batch', {
+            method: 'POST',
+            body: formData
+        });
+    },
+    getTaskStatus: (taskId)=>fetchWithAuth(`/tasks/${taskId}`),
     getUsers: ()=>fetchWithAuth('/users'),
     verifyUser: (userId, role)=>fetchWithAuth(`/admin/verify_user/${userId}?role=${role}`, {
             method: 'PUT'
@@ -1051,7 +1071,7 @@ function Sidebar({ currentView, setView, onLogout, userId }) {
                                     color: '#C06820',
                                     fontWeight: 600
                                 },
-                                children: "v4.0 — CUSTOMS"
+                                children: "v4.0 - CUSTOMS"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/components/Sidebar.jsx",
                                 lineNumber: 30,
@@ -2942,7 +2962,7 @@ function Containers({ data }) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'risk_export.csv';
+        a.download = `Risk_Predictions_Export_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
     };
     const filtered = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
@@ -3586,9 +3606,8 @@ const TT = {
     fontSize: 13,
     color: '#2C2418'
 };
-function Analytics({ data }) {
+const DeclarationTimeMap = /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].memo(({ timeHeatmap, data })=>{
     const [selectedHour, setSelectedHour] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
-    // containers for the selected hour
     const selectedContainers = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
         if (selectedHour === null) return [];
         return data.filter((d)=>{
@@ -3599,70 +3618,701 @@ function Analytics({ data }) {
         data,
         selectedHour
     ]);
-    // ── Risk score histogram (buckets of 0.1) ──
-    const histogram = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
-        const buckets = Array.from({
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+        style: CARD,
+        children: [
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                style: LABEL,
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$clock$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Clock$3e$__["Clock"], {
+                        size: 16,
+                        color: "#C06820"
+                    }, void 0, false, {
+                        fileName: "[project]/src/app/components/Analytics.jsx",
+                        lineNumber: 37,
+                        columnNumber: 32
+                    }, ("TURBOPACK compile-time value", void 0)),
+                    " DECLARATION TIME: 24-HOUR RISK MAP ",
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                        style: {
+                            fontSize: 10,
+                            color: '#7A6E5D',
+                            fontWeight: 500,
+                            letterSpacing: 0.5
+                        },
+                        children: "(click any hour)"
+                    }, void 0, false, {
+                        fileName: "[project]/src/app/components/Analytics.jsx",
+                        lineNumber: 37,
+                        columnNumber: 103
+                    }, ("TURBOPACK compile-time value", void 0))
+                ]
+            }, void 0, true, {
+                fileName: "[project]/src/app/components/Analytics.jsx",
+                lineNumber: 37,
+                columnNumber: 13
+            }, ("TURBOPACK compile-time value", void 0)),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                style: {
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(12, 1fr)',
+                    gap: 4,
+                    marginBottom: 4
+                },
+                children: timeHeatmap.slice(0, 12).map((h, i)=>{
+                    const intensity = h.total === 0 ? 0 : h.avgRisk;
+                    const bg = h.total === 0 ? '#F5F0E8' : intensity >= 0.5 ? `rgba(198,40,40,${0.15 + intensity * 0.5})` : intensity >= 0.25 ? `rgba(230,81,0,${0.1 + intensity * 0.4})` : `rgba(46,125,50,${0.08 + intensity * 0.3})`;
+                    const isSelected = selectedHour === h.hour;
+                    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        onClick: ()=>h.total > 0 ? setSelectedHour(isSelected ? null : h.hour) : null,
+                        style: {
+                            position: 'relative',
+                            borderRadius: 6,
+                            background: bg,
+                            border: isSelected ? '2px solid #C06820' : h.isOffHours ? '1px solid rgba(198,40,40,0.25)' : '1px solid #EDE7DB',
+                            padding: '8px 4px',
+                            textAlign: 'center',
+                            cursor: h.total > 0 ? 'pointer' : 'default',
+                            minHeight: 72,
+                            transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                            transition: 'all 0.15s ease',
+                            boxShadow: isSelected ? '0 2px 8px rgba(192,104,32,0.25)' : 'none'
+                        },
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    fontFamily: 'Quicksand',
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    color: h.isOffHours ? '#C62828' : '#7A6E5D',
+                                    marginBottom: 4
+                                },
+                                children: h.label
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                lineNumber: 62,
+                                columnNumber: 29
+                            }, ("TURBOPACK compile-time value", void 0)),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    fontFamily: 'Quicksand',
+                                    fontSize: 16,
+                                    fontWeight: 700,
+                                    color: '#2C2418'
+                                },
+                                children: h.total
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                lineNumber: 65,
+                                columnNumber: 29
+                            }, ("TURBOPACK compile-time value", void 0)),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    fontFamily: 'Quicksand',
+                                    fontSize: 9,
+                                    color: '#7A6E5D',
+                                    marginTop: 2,
+                                    fontWeight: 600
+                                },
+                                children: h.total > 0 ? `r:${h.avgRisk.toFixed(2)}` : '—'
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                lineNumber: 68,
+                                columnNumber: 29
+                            }, ("TURBOPACK compile-time value", void 0)),
+                            h.isOffHours && h.total > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    position: 'absolute',
+                                    top: 2,
+                                    right: 2,
+                                    width: 5,
+                                    height: 5,
+                                    borderRadius: '50%',
+                                    background: '#C62828'
+                                }
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                lineNumber: 72,
+                                columnNumber: 33
+                            }, ("TURBOPACK compile-time value", void 0))
+                        ]
+                    }, i, true, {
+                        fileName: "[project]/src/app/components/Analytics.jsx",
+                        lineNumber: 51,
+                        columnNumber: 25
+                    }, ("TURBOPACK compile-time value", void 0));
+                })
+            }, void 0, false, {
+                fileName: "[project]/src/app/components/Analytics.jsx",
+                lineNumber: 39,
+                columnNumber: 13
+            }, ("TURBOPACK compile-time value", void 0)),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                style: {
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(12, 1fr)',
+                    gap: 4,
+                    marginBottom: 12
+                },
+                children: timeHeatmap.slice(12).map((h, i)=>{
+                    const intensity = h.total === 0 ? 0 : h.avgRisk;
+                    const bg = h.total === 0 ? '#F5F0E8' : intensity >= 0.5 ? `rgba(198,40,40,${0.15 + intensity * 0.5})` : intensity >= 0.25 ? `rgba(230,81,0,${0.1 + intensity * 0.4})` : `rgba(46,125,50,${0.08 + intensity * 0.3})`;
+                    const isSelected = selectedHour === h.hour;
+                    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        onClick: ()=>h.total > 0 ? setSelectedHour(isSelected ? null : h.hour) : null,
+                        style: {
+                            position: 'relative',
+                            borderRadius: 6,
+                            background: bg,
+                            border: isSelected ? '2px solid #C06820' : h.isOffHours ? '1px solid rgba(198,40,40,0.25)' : '1px solid #EDE7DB',
+                            padding: '8px 4px',
+                            textAlign: 'center',
+                            cursor: h.total > 0 ? 'pointer' : 'default',
+                            minHeight: 72,
+                            transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                            transition: 'all 0.15s ease',
+                            boxShadow: isSelected ? '0 2px 8px rgba(192,104,32,0.25)' : 'none'
+                        },
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    fontFamily: 'Quicksand',
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    color: h.isOffHours ? '#C62828' : '#7A6E5D',
+                                    marginBottom: 4
+                                },
+                                children: h.label
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                lineNumber: 102,
+                                columnNumber: 29
+                            }, ("TURBOPACK compile-time value", void 0)),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    fontFamily: 'Quicksand',
+                                    fontSize: 16,
+                                    fontWeight: 700,
+                                    color: '#2C2418'
+                                },
+                                children: h.total
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                lineNumber: 105,
+                                columnNumber: 29
+                            }, ("TURBOPACK compile-time value", void 0)),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    fontFamily: 'Quicksand',
+                                    fontSize: 9,
+                                    color: '#7A6E5D',
+                                    marginTop: 2,
+                                    fontWeight: 600
+                                },
+                                children: h.total > 0 ? `r:${h.avgRisk.toFixed(2)}` : '—'
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                lineNumber: 108,
+                                columnNumber: 29
+                            }, ("TURBOPACK compile-time value", void 0)),
+                            h.isOffHours && h.total > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    position: 'absolute',
+                                    top: 2,
+                                    right: 2,
+                                    width: 5,
+                                    height: 5,
+                                    borderRadius: '50%',
+                                    background: '#C62828'
+                                }
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                lineNumber: 112,
+                                columnNumber: 33
+                            }, ("TURBOPACK compile-time value", void 0))
+                        ]
+                    }, i, true, {
+                        fileName: "[project]/src/app/components/Analytics.jsx",
+                        lineNumber: 91,
+                        columnNumber: 25
+                    }, ("TURBOPACK compile-time value", void 0));
+                })
+            }, void 0, false, {
+                fileName: "[project]/src/app/components/Analytics.jsx",
+                lineNumber: 79,
+                columnNumber: 13
+            }, ("TURBOPACK compile-time value", void 0)),
+            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                style: {
+                    display: 'flex',
+                    gap: 16,
+                    fontSize: 11,
+                    color: '#7A6E5D',
+                    fontWeight: 500,
+                    marginBottom: selectedHour !== null ? 16 : 0
+                },
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                        style: {
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4
+                        },
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: 2,
+                                    background: 'rgba(46,125,50,0.25)'
+                                }
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                lineNumber: 121,
+                                columnNumber: 81
+                            }, ("TURBOPACK compile-time value", void 0)),
+                            " Low Risk"
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/app/components/Analytics.jsx",
+                        lineNumber: 121,
+                        columnNumber: 17
+                    }, ("TURBOPACK compile-time value", void 0)),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                        style: {
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4
+                        },
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: 2,
+                                    background: 'rgba(230,81,0,0.3)'
+                                }
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                lineNumber: 122,
+                                columnNumber: 81
+                            }, ("TURBOPACK compile-time value", void 0)),
+                            " Medium Risk"
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/app/components/Analytics.jsx",
+                        lineNumber: 122,
+                        columnNumber: 17
+                    }, ("TURBOPACK compile-time value", void 0)),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                        style: {
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4
+                        },
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: 2,
+                                    background: 'rgba(198,40,40,0.5)'
+                                }
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                lineNumber: 123,
+                                columnNumber: 81
+                            }, ("TURBOPACK compile-time value", void 0)),
+                            " Critical Risk"
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/app/components/Analytics.jsx",
+                        lineNumber: 123,
+                        columnNumber: 17
+                    }, ("TURBOPACK compile-time value", void 0)),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                        style: {
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4
+                        },
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    width: 5,
+                                    height: 5,
+                                    borderRadius: '50%',
+                                    background: '#C62828'
+                                }
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                lineNumber: 124,
+                                columnNumber: 81
+                            }, ("TURBOPACK compile-time value", void 0)),
+                            " Off-Hours"
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/app/components/Analytics.jsx",
+                        lineNumber: 124,
+                        columnNumber: 17
+                    }, ("TURBOPACK compile-time value", void 0))
+                ]
+            }, void 0, true, {
+                fileName: "[project]/src/app/components/Analytics.jsx",
+                lineNumber: 120,
+                columnNumber: 13
+            }, ("TURBOPACK compile-time value", void 0)),
+            selectedHour !== null && selectedContainers.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                style: {
+                    animation: 'fadeInUp 0.25s ease-out'
+                },
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        style: {
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: 12
+                        },
+                        children: [
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    fontFamily: 'Quicksand',
+                                    fontSize: 13,
+                                    fontWeight: 700,
+                                    color: '#C06820'
+                                },
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$ship$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Ship$3e$__["Ship"], {
+                                        size: 14,
+                                        style: {
+                                            marginRight: 6,
+                                            verticalAlign: -2
+                                        }
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/app/components/Analytics.jsx",
+                                        lineNumber: 132,
+                                        columnNumber: 29
+                                    }, ("TURBOPACK compile-time value", void 0)),
+                                    selectedContainers.length,
+                                    " CONTAINER",
+                                    selectedContainers.length > 1 ? 'S' : '',
+                                    " DECLARED AT ",
+                                    String(selectedHour).padStart(2, '0'),
+                                    ":00"
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                lineNumber: 131,
+                                columnNumber: 25
+                            }, ("TURBOPACK compile-time value", void 0)),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                onClick: ()=>setSelectedHour(null),
+                                style: {
+                                    cursor: 'pointer',
+                                    padding: 4,
+                                    borderRadius: 4,
+                                    background: '#EDE7DB',
+                                    display: 'flex'
+                                },
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$x$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__X$3e$__["X"], {
+                                    size: 14,
+                                    color: "#7A6E5D"
+                                }, void 0, false, {
+                                    fileName: "[project]/src/app/components/Analytics.jsx",
+                                    lineNumber: 136,
+                                    columnNumber: 29
+                                }, ("TURBOPACK compile-time value", void 0))
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                lineNumber: 135,
+                                columnNumber: 25
+                            }, ("TURBOPACK compile-time value", void 0))
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/app/components/Analytics.jsx",
+                        lineNumber: 130,
+                        columnNumber: 21
+                    }, ("TURBOPACK compile-time value", void 0)),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        style: {
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 8,
+                            maxHeight: 400,
+                            overflowY: 'auto',
+                            paddingRight: 8
+                        },
+                        children: selectedContainers.map((c, ci)=>{
+                            const decl = Number(c.Declared_Weight) || 1;
+                            const meas = Number(c.Measured_Weight) || 0;
+                            const wtDelta = ((meas - decl) / decl * 100).toFixed(1);
+                            const vpk = decl > 0 ? ((Number(c.Declared_Value) || 0) / decl).toFixed(2) : '0';
+                            const riskColor = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$data$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getRiskColor"])(c.Risk_Level);
+                            return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    background: '#FFFDF8',
+                                    border: `1px solid ${riskColor}22`,
+                                    borderLeft: `4px solid ${riskColor}`,
+                                    borderRadius: 8,
+                                    padding: '12px 16px'
+                                },
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        style: {
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            marginBottom: 8
+                                        },
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                style: {
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 8
+                                                },
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        style: {
+                                                            fontFamily: 'Quicksand',
+                                                            fontSize: 14,
+                                                            fontWeight: 700,
+                                                            color: '#2C2418'
+                                                        },
+                                                        children: c.Container_ID
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/app/components/Analytics.jsx",
+                                                        lineNumber: 154,
+                                                        columnNumber: 45
+                                                    }, ("TURBOPACK compile-time value", void 0)),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        style: {
+                                                            fontFamily: 'Quicksand',
+                                                            fontSize: 10,
+                                                            fontWeight: 700,
+                                                            padding: '2px 8px',
+                                                            borderRadius: 4,
+                                                            background: `${riskColor}15`,
+                                                            color: riskColor,
+                                                            letterSpacing: 1
+                                                        },
+                                                        children: [
+                                                            c.Risk_Level === 'Critical' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$triangle$2d$alert$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__AlertTriangle$3e$__["AlertTriangle"], {
+                                                                size: 10,
+                                                                style: {
+                                                                    marginRight: 3,
+                                                                    verticalAlign: -1
+                                                                }
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                                                lineNumber: 161,
+                                                                columnNumber: 81
+                                                            }, ("TURBOPACK compile-time value", void 0)),
+                                                            c.Risk_Level.toUpperCase()
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/src/app/components/Analytics.jsx",
+                                                        lineNumber: 155,
+                                                        columnNumber: 45
+                                                    }, ("TURBOPACK compile-time value", void 0))
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                                lineNumber: 153,
+                                                columnNumber: 41
+                                            }, ("TURBOPACK compile-time value", void 0)),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                style: {
+                                                    fontFamily: 'Quicksand',
+                                                    fontSize: 18,
+                                                    fontWeight: 700,
+                                                    color: riskColor
+                                                },
+                                                children: c.Risk_Score.toFixed(3)
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                                lineNumber: 165,
+                                                columnNumber: 41
+                                            }, ("TURBOPACK compile-time value", void 0))
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/src/app/components/Analytics.jsx",
+                                        lineNumber: 152,
+                                        columnNumber: 37
+                                    }, ("TURBOPACK compile-time value", void 0)),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        style: {
+                                            display: 'grid',
+                                            gridTemplateColumns: 'repeat(5, 1fr)',
+                                            gap: 8
+                                        },
+                                        children: [
+                                            {
+                                                label: 'ROUTE',
+                                                value: `${c.Origin_Country} → ${c.Destination_Country}`,
+                                                icon: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$map$2d$pin$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__MapPin$3e$__["MapPin"], {
+                                                    size: 11
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/app/components/Analytics.jsx",
+                                                    lineNumber: 169,
+                                                    columnNumber: 126
+                                                }, ("TURBOPACK compile-time value", void 0))
+                                            },
+                                            {
+                                                label: 'WT DELTA',
+                                                value: `${wtDelta}%`,
+                                                icon: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$weight$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Weight$3e$__["Weight"], {
+                                                    size: 11
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/app/components/Analytics.jsx",
+                                                    lineNumber: 170,
+                                                    columnNumber: 94
+                                                }, ("TURBOPACK compile-time value", void 0))
+                                            },
+                                            {
+                                                label: 'VALUE/KG',
+                                                value: `$${vpk}`,
+                                                icon: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$dollar$2d$sign$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__DollarSign$3e$__["DollarSign"], {
+                                                    size: 11
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/app/components/Analytics.jsx",
+                                                    lineNumber: 171,
+                                                    columnNumber: 90
+                                                }, ("TURBOPACK compile-time value", void 0))
+                                            },
+                                            {
+                                                label: 'DWELL',
+                                                value: `${c.Dwell_Time_Hours}h`,
+                                                icon: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$clock$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Clock$3e$__["Clock"], {
+                                                    size: 11
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/app/components/Analytics.jsx",
+                                                    lineNumber: 172,
+                                                    columnNumber: 102
+                                                }, ("TURBOPACK compile-time value", void 0))
+                                            },
+                                            {
+                                                label: 'HS CODE',
+                                                value: c.HS_Code,
+                                                icon: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$package$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Package$3e$__["Package"], {
+                                                    size: 11
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/app/components/Analytics.jsx",
+                                                    lineNumber: 173,
+                                                    columnNumber: 89
+                                                }, ("TURBOPACK compile-time value", void 0))
+                                            }
+                                        ].map((f, fi)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                        style: {
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 3,
+                                                            marginBottom: 2
+                                                        },
+                                                        children: [
+                                                            /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].cloneElement(f.icon, {
+                                                                color: '#7A6E5D'
+                                                            }),
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                style: {
+                                                                    fontFamily: 'Quicksand',
+                                                                    fontSize: 9,
+                                                                    color: '#7A6E5D',
+                                                                    letterSpacing: 1,
+                                                                    fontWeight: 700
+                                                                },
+                                                                children: f.label
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                                                lineNumber: 178,
+                                                                columnNumber: 53
+                                                            }, ("TURBOPACK compile-time value", void 0))
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/src/app/components/Analytics.jsx",
+                                                        lineNumber: 176,
+                                                        columnNumber: 49
+                                                    }, ("TURBOPACK compile-time value", void 0)),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                        style: {
+                                                            fontFamily: 'Quicksand',
+                                                            fontSize: 13,
+                                                            fontWeight: 600,
+                                                            color: '#2C2418'
+                                                        },
+                                                        children: f.value
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/src/app/components/Analytics.jsx",
+                                                        lineNumber: 180,
+                                                        columnNumber: 49
+                                                    }, ("TURBOPACK compile-time value", void 0))
+                                                ]
+                                            }, fi, true, {
+                                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                                lineNumber: 175,
+                                                columnNumber: 45
+                                            }, ("TURBOPACK compile-time value", void 0)))
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/app/components/Analytics.jsx",
+                                        lineNumber: 167,
+                                        columnNumber: 37
+                                    }, ("TURBOPACK compile-time value", void 0))
+                                ]
+                            }, ci, true, {
+                                fileName: "[project]/src/app/components/Analytics.jsx",
+                                lineNumber: 147,
+                                columnNumber: 33
+                            }, ("TURBOPACK compile-time value", void 0));
+                        })
+                    }, void 0, false, {
+                        fileName: "[project]/src/app/components/Analytics.jsx",
+                        lineNumber: 139,
+                        columnNumber: 21
+                    }, ("TURBOPACK compile-time value", void 0))
+                ]
+            }, void 0, true, {
+                fileName: "[project]/src/app/components/Analytics.jsx",
+                lineNumber: 129,
+                columnNumber: 17
+            }, ("TURBOPACK compile-time value", void 0))
+        ]
+    }, void 0, true, {
+        fileName: "[project]/src/app/components/Analytics.jsx",
+        lineNumber: 36,
+        columnNumber: 9
+    }, ("TURBOPACK compile-time value", void 0));
+});
+function Analytics({ data }) {
+    // ── Optimized Single-Pass Data Processing ──
+    const { histogram, origins, weightData, dwellData, regimeData, offHoursData, vpkData, hsData, timeHeatmap, kpis } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
+        // Initialize structures
+        const hist = Array.from({
             length: 10
         }, (_, i)=>({
-                range: `${(i * 0.1).toFixed(1)}–${((i + 1) * 0.1).toFixed(1)}`,
+                range: `${(i * 0.1).toFixed(1)}-${((i + 1) * 0.1).toFixed(1)}`,
                 count: 0,
                 low: i * 0.1
             }));
-        data.forEach((d)=>{
-            const idx = Math.min(Math.floor(d.Risk_Score * 10), 9);
-            buckets[idx].count++;
-        });
-        return buckets;
-    }, [
-        data
-    ]);
-    // ── Top origin countries ──
-    const origins = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
-        const map = {};
-        data.forEach((d)=>{
-            const c = d.Origin_Country || 'Unknown';
-            map[c] = (map[c] || 0) + 1;
-        });
-        return Object.entries(map).map(([country, count])=>({
-                country,
-                count
-            })).sort((a, b)=>b.count - a.count).slice(0, 10);
-    }, [
-        data
-    ]);
-    // ── Weight discrepancy scatter ──
-    const weightData = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
-        return data.map((d)=>{
-            const decl = Number(d.Declared_Weight) || 1;
-            const meas = Number(d.Measured_Weight) || 0;
-            const discrepancy = (meas - decl) / decl * 100;
-            return {
-                id: d.Container_ID,
-                riskScore: d.Risk_Score,
-                discrepancy: parseFloat(discrepancy.toFixed(1)),
-                level: d.Risk_Level
-            };
-        });
-    }, [
-        data
-    ]);
-    // ── Dwell time distribution ──
-    const dwellData = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
-        const buckets = [
+        const originMap = {};
+        const weights = [];
+        const dwellBuckets = [
             {
-                range: '0–24h',
+                range: '0-24h',
                 count: 0
             },
             {
-                range: '24–48h',
+                range: '24-48h',
                 count: 0
             },
             {
-                range: '48–72h',
+                range: '48-72h',
                 count: 0
             },
             {
-                range: '72–120h',
+                range: '72-120h',
                 count: 0
             },
             {
@@ -3670,79 +4320,9 @@ function Analytics({ data }) {
                 count: 0
             }
         ];
-        data.forEach((d)=>{
-            const h = d.Dwell_Time_Hours || 0;
-            if (h <= 24) buckets[0].count++;
-            else if (h <= 48) buckets[1].count++;
-            else if (h <= 72) buckets[2].count++;
-            else if (h <= 120) buckets[3].count++;
-            else buckets[4].count++;
-        });
-        return buckets;
-    }, [
-        data
-    ]);
-    // ── Risk by trade regime ──
-    const regimeData = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
-        const map = {};
-        data.forEach((d)=>{
-            const r = d.Trade_Regime || 'Unknown';
-            if (!map[r]) map[r] = {
-                regime: r,
-                total: 0,
-                critical: 0,
-                medium: 0,
-                low: 0
-            };
-            map[r].total++;
-            if (d.Risk_Level === 'Critical') map[r].critical++;
-            else if (d.Risk_Level === 'Medium Risk') map[r].medium++;
-            else map[r].low++;
-        });
-        return Object.values(map);
-    }, [
-        data
-    ]);
-    // ── NEW: Off-Hours Declaration Analysis (#1) ──
-    const offHoursData = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
-        let offHours = 0, businessHours = 0;
-        let offCritical = 0, busCritical = 0;
-        data.forEach((d)=>{
-            const h = parseInt((d.Declaration_Time || '12:00').split(':')[0]);
-            if (h < 6 || h > 20) {
-                offHours++;
-                if (d.Risk_Level === 'Critical') offCritical++;
-            } else {
-                businessHours++;
-                if (d.Risk_Level === 'Critical') busCritical++;
-            }
-        });
-        return {
-            pie: [
-                {
-                    name: 'Off-Hours (10PM–6AM)',
-                    value: offHours,
-                    color: '#C62828'
-                },
-                {
-                    name: 'Business Hours (6AM–10PM)',
-                    value: businessHours,
-                    color: '#2E7D32'
-                }
-            ],
-            offHours,
-            businessHours,
-            offCritical,
-            busCritical,
-            offCritPct: offHours ? (offCritical / offHours * 100).toFixed(1) : 0,
-            busCritPct: businessHours ? (busCritical / businessHours * 100).toFixed(1) : 0
-        };
-    }, [
-        data
-    ]);
-    // ── NEW: Value per Kg Analysis (#4) ──
-    const vpkData = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
-        const buckets = [
+        const regimeMap = {};
+        let offHours = 0, businessHours = 0, offCritical = 0, busCritical = 0;
+        const vpkBuckets = [
             {
                 range: '$0/kg',
                 count: 0,
@@ -3758,21 +4338,21 @@ function Analytics({ data }) {
                 label: 'Very Low'
             },
             {
-                range: '$10–100',
+                range: '$10-100',
                 count: 0,
                 avgRisk: 0,
                 total: 0,
                 label: 'Low'
             },
             {
-                range: '$100–500',
+                range: '$100-500',
                 count: 0,
                 avgRisk: 0,
                 total: 0,
                 label: 'Medium'
             },
             {
-                range: '$500–2K',
+                range: '$500-2K',
                 count: 0,
                 avgRisk: 0,
                 total: 0,
@@ -3786,53 +4366,8 @@ function Analytics({ data }) {
                 label: 'Very High'
             }
         ];
-        data.forEach((d)=>{
-            const wt = Number(d.Declared_Weight) || 1;
-            const vpk = (Number(d.Declared_Value) || 0) / wt;
-            const risk = d.Risk_Score;
-            let idx;
-            if (vpk === 0) idx = 0;
-            else if (vpk < 10) idx = 1;
-            else if (vpk < 100) idx = 2;
-            else if (vpk < 500) idx = 3;
-            else if (vpk < 2000) idx = 4;
-            else idx = 5;
-            buckets[idx].count++;
-            buckets[idx].total += risk;
-        });
-        buckets.forEach((b)=>{
-            b.avgRisk = b.count ? parseFloat((b.total / b.count).toFixed(3)) : 0;
-        });
-        return buckets;
-    }, [
-        data
-    ]);
-    // ── NEW: HS Code Hotspots (#5) ──
-    const hsData = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
-        const map = {};
-        data.forEach((d)=>{
-            const hs = String(d.HS_Code || 'Unknown');
-            const prefix = hs.length >= 4 ? hs.slice(0, 4) : hs;
-            if (!map[prefix]) map[prefix] = {
-                hsCode: prefix,
-                total: 0,
-                sumRisk: 0,
-                critical: 0
-            };
-            map[prefix].total++;
-            map[prefix].sumRisk += d.Risk_Score;
-            if (d.Risk_Level === 'Critical') map[prefix].critical++;
-        });
-        return Object.values(map).map((h)=>({
-                ...h,
-                avgRisk: parseFloat((h.sumRisk / h.total).toFixed(3))
-            })).sort((a, b)=>b.avgRisk - a.avgRisk).slice(0, 10);
-    }, [
-        data
-    ]);
-    // ── NEW: Declaration Time Heatmap (#9) ──
-    const timeHeatmap = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
-        const hours = Array.from({
+        const hsMap = {};
+        const hoursHeatmap = Array.from({
             length: 24
         }, (_, i)=>({
                 hour: i,
@@ -3843,40 +4378,153 @@ function Analytics({ data }) {
                 sumRisk: 0,
                 isOffHours: i < 6 || i > 20
             }));
+        let sumScore = 0, sumDwell = 0, anomalyCount = 0, sumAbsDisc = 0, critCount = 0;
+        const originSet = new Set();
+        // SINGLE PASS
         data.forEach((d)=>{
-            const h = parseInt((d.Declaration_Time || '12:00').split(':')[0]);
-            if (h >= 0 && h < 24) {
-                hours[h].total++;
-                hours[h].sumRisk += d.Risk_Score;
-                if (d.Risk_Level === 'Critical') hours[h].critical++;
-            }
-        });
-        hours.forEach((h)=>{
-            h.avgRisk = h.total ? parseFloat((h.sumRisk / h.total).toFixed(3)) : 0;
-        });
-        return hours;
-    }, [
-        data
-    ]);
-    // ── KPI stats ──
-    const kpis = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
-        const avgScore = data.length ? data.reduce((s, d)=>s + d.Risk_Score, 0) / data.length : 0;
-        const avgDwell = data.length ? data.reduce((s, d)=>s + (d.Dwell_Time_Hours || 0), 0) / data.length : 0;
-        const anomalyRate = data.length ? data.filter((d)=>d.Anomaly_Flag).length / data.length * 100 : 0;
-        const avgDisc = data.length ? data.reduce((s, d)=>{
+            const risk = d.Risk_Score || 0;
+            const level = d.Risk_Level;
+            // Stats
+            sumScore += risk;
+            sumDwell += Number(d.Dwell_Time_Hours) || 0;
+            if (d.Anomaly_Flag) anomalyCount++;
+            if (level === 'Critical') critCount++;
+            // Histogram
+            const hIdx = Math.min(Math.floor(risk * 10), 9);
+            hist[hIdx].count++;
+            // Origins
+            const origin = d.Origin_Country || 'Unknown';
+            originMap[origin] = (originMap[origin] || 0) + 1;
+            originSet.add(origin);
+            // Weight (to be sampled later)
             const decl = Number(d.Declared_Weight) || 1;
             const meas = Number(d.Measured_Weight) || 0;
-            return s + Math.abs((meas - decl) / decl * 100);
-        }, 0) / data.length : 0;
-        const uniqueOrigins = new Set(data.map((d)=>d.Origin_Country)).size;
-        const criticalPct = data.length ? data.filter((d)=>d.Risk_Level === 'Critical').length / data.length * 100 : 0;
+            const disc = decl > 0 ? (meas - decl) / decl * 100 : 0;
+            sumAbsDisc += Math.abs(disc);
+            weights.push({
+                id: d.Container_ID,
+                riskScore: risk,
+                discrepancy: parseFloat(disc.toFixed(1)),
+                level
+            });
+            // Dwell
+            const h = d.Dwell_Time_Hours || 0;
+            if (h <= 24) dwellBuckets[0].count++;
+            else if (h <= 48) dwellBuckets[1].count++;
+            else if (h <= 72) dwellBuckets[2].count++;
+            else if (h <= 120) dwellBuckets[3].count++;
+            else dwellBuckets[4].count++;
+            // Regime
+            const r = d.Trade_Regime || 'Unknown';
+            if (!regimeMap[r]) regimeMap[r] = {
+                regime: r,
+                total: 0,
+                critical: 0,
+                medium: 0,
+                low: 0
+            };
+            regimeMap[r].total++;
+            if (level === 'Critical') regimeMap[r].critical++;
+            else if (level === 'Medium Risk') regimeMap[r].medium++;
+            else regimeMap[r].low++;
+            // Time Analysis
+            const timeStr = d.Declaration_Time || '12:00';
+            const hour = parseInt(timeStr.split(':')[0]);
+            if (hour >= 0 && hour < 24) {
+                hoursHeatmap[hour].total++;
+                hoursHeatmap[hour].sumRisk += risk;
+                if (level === 'Critical') hoursHeatmap[hour].critical++;
+                if (hour < 6 || hour > 20) {
+                    offHours++;
+                    if (level === 'Critical') offCritical++;
+                } else {
+                    businessHours++;
+                    if (level === 'Critical') busCritical++;
+                }
+            }
+            // Value per Kg
+            const vpk = (Number(d.Declared_Value) || 0) / decl;
+            let vIdx;
+            if (vpk === 0) vIdx = 0;
+            else if (vpk < 10) vIdx = 1;
+            else if (vpk < 100) vIdx = 2;
+            else if (vpk < 500) vIdx = 3;
+            else if (vpk < 2000) vIdx = 4;
+            else vIdx = 5;
+            vpkBuckets[vIdx].count++;
+            vpkBuckets[vIdx].total += risk;
+            // HS Hotspots
+            const hs = String(d.HS_Code || 'Unknown');
+            const prefix = hs.length >= 4 ? hs.slice(0, 4) : hs;
+            if (!hsMap[prefix]) hsMap[prefix] = {
+                hsCode: prefix,
+                total: 0,
+                sumRisk: 0,
+                critical: 0
+            };
+            hsMap[prefix].total++;
+            hsMap[prefix].sumRisk += risk;
+            if (level === 'Critical') hsMap[prefix].critical++;
+        });
+        // Post-processing
+        const topOrigins = Object.entries(originMap).map(([country, count])=>({
+                country,
+                count
+            })).sort((a, b)=>b.count - a.count).slice(0, 10);
+        // SHARP OPTIMIZATION: Sample scatter plot data if too large
+        const MAX_POINTS = 600;
+        let sampledWeights = weights;
+        if (weights.length > MAX_POINTS) {
+            const step = Math.ceil(weights.length / MAX_POINTS);
+            sampledWeights = weights.filter((_, i)=>i % step === 0);
+        }
+        const topHS = Object.values(hsMap).map((h)=>({
+                ...h,
+                avgRisk: parseFloat((h.sumRisk / h.total).toFixed(3))
+            })).sort((a, b)=>b.avgRisk - a.avgRisk).slice(0, 10);
+        hoursHeatmap.forEach((h)=>{
+            h.avgRisk = h.total ? parseFloat((h.sumRisk / h.total).toFixed(3)) : 0;
+        });
+        vpkBuckets.forEach((b)=>{
+            b.avgRisk = b.count ? parseFloat((b.total / b.count).toFixed(3)) : 0;
+        });
         return {
-            avgScore,
-            avgDwell,
-            anomalyRate,
-            avgDisc,
-            uniqueOrigins,
-            criticalPct
+            histogram: hist,
+            origins: topOrigins,
+            weightData: sampledWeights,
+            dwellData: dwellBuckets,
+            regimeData: Object.values(regimeMap),
+            offHoursData: {
+                pie: [
+                    {
+                        name: 'Off-Hours (10PM-6AM)',
+                        value: offHours,
+                        color: '#C62828'
+                    },
+                    {
+                        name: 'Business Hours (6AM-10PM)',
+                        value: businessHours,
+                        color: '#2E7D32'
+                    }
+                ],
+                offHours,
+                businessHours,
+                offCritical,
+                busCritical,
+                offCritPct: offHours ? (offCritical / offHours * 100).toFixed(1) : 0,
+                busCritPct: businessHours ? (busCritical / businessHours * 100).toFixed(1) : 0
+            },
+            vpkData: vpkBuckets,
+            hsData: topHS,
+            timeHeatmap: hoursHeatmap,
+            kpis: {
+                avgScore: data.length ? sumScore / data.length : 0,
+                avgDwell: data.length ? sumDwell / data.length : 0,
+                anomalyRate: data.length ? anomalyCount / data.length * 100 : 0,
+                avgDisc: data.length ? sumAbsDisc / data.length : 0,
+                uniqueOrigins: originSet.size,
+                criticalPct: data.length ? critCount / data.length * 100 : 0
+            }
         };
     }, [
         data
@@ -3898,7 +4546,7 @@ function Analytics({ data }) {
                 children: "RISK ANALYTICS"
             }, void 0, false, {
                 fileName: "[project]/src/app/components/Analytics.jsx",
-                lineNumber: 221,
+                lineNumber: 377,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3917,7 +4565,7 @@ function Analytics({ data }) {
                             size: 16
                         }, void 0, false, {
                             fileName: "[project]/src/app/components/Analytics.jsx",
-                            lineNumber: 228,
+                            lineNumber: 384,
                             columnNumber: 134
                         }, this)
                     },
@@ -3929,7 +4577,7 @@ function Analytics({ data }) {
                             size: 16
                         }, void 0, false, {
                             fileName: "[project]/src/app/components/Analytics.jsx",
-                            lineNumber: 229,
+                            lineNumber: 385,
                             columnNumber: 110
                         }, this)
                     },
@@ -3941,7 +4589,7 @@ function Analytics({ data }) {
                             size: 16
                         }, void 0, false, {
                             fileName: "[project]/src/app/components/Analytics.jsx",
-                            lineNumber: 230,
+                            lineNumber: 386,
                             columnNumber: 112
                         }, this)
                     },
@@ -3953,7 +4601,7 @@ function Analytics({ data }) {
                             size: 16
                         }, void 0, false, {
                             fileName: "[project]/src/app/components/Analytics.jsx",
-                            lineNumber: 231,
+                            lineNumber: 387,
                             columnNumber: 108
                         }, this)
                     },
@@ -3965,7 +4613,7 @@ function Analytics({ data }) {
                             size: 16
                         }, void 0, false, {
                             fileName: "[project]/src/app/components/Analytics.jsx",
-                            lineNumber: 232,
+                            lineNumber: 388,
                             columnNumber: 106
                         }, this)
                     },
@@ -3977,7 +4625,7 @@ function Analytics({ data }) {
                             size: 16
                         }, void 0, false, {
                             fileName: "[project]/src/app/components/Analytics.jsx",
-                            lineNumber: 233,
+                            lineNumber: 389,
                             columnNumber: 92
                         }, this)
                     }
@@ -4012,13 +4660,13 @@ function Analytics({ data }) {
                                         children: k.label
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 238,
+                                        lineNumber: 394,
                                         columnNumber: 29
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 236,
+                                lineNumber: 392,
                                 columnNumber: 25
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4031,18 +4679,18 @@ function Analytics({ data }) {
                                 children: k.value
                             }, void 0, false, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 240,
+                                lineNumber: 396,
                                 columnNumber: 25
                             }, this)
                         ]
                     }, i, true, {
                         fileName: "[project]/src/app/components/Analytics.jsx",
-                        lineNumber: 235,
+                        lineNumber: 391,
                         columnNumber: 21
                     }, this))
             }, void 0, false, {
                 fileName: "[project]/src/app/components/Analytics.jsx",
-                lineNumber: 226,
+                lineNumber: 382,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4064,14 +4712,14 @@ function Analytics({ data }) {
                                         color: "#C06820"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 248,
+                                        lineNumber: 404,
                                         columnNumber: 40
                                     }, this),
                                     " RISK SCORE DISTRIBUTION"
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 248,
+                                lineNumber: 404,
                                 columnNumber: 21
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$component$2f$ResponsiveContainer$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ResponsiveContainer"], {
@@ -4086,7 +4734,7 @@ function Analytics({ data }) {
                                             stroke: "#EDE7DB"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 251,
+                                            lineNumber: 407,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$XAxis$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["XAxis"], {
@@ -4098,7 +4746,7 @@ function Analytics({ data }) {
                                             }
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 252,
+                                            lineNumber: 408,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$YAxis$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["YAxis"], {
@@ -4110,14 +4758,14 @@ function Analytics({ data }) {
                                             allowDecimals: false
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 253,
+                                            lineNumber: 409,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$component$2f$Tooltip$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Tooltip"], {
                                             contentStyle: TT
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 254,
+                                            lineNumber: 410,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$Bar$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Bar"], {
@@ -4132,29 +4780,29 @@ function Analytics({ data }) {
                                                     fill: b.low >= 0.5 ? '#C62828' : b.low >= 0.25 ? '#E65100' : '#2E7D32'
                                                 }, i, false, {
                                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                                    lineNumber: 257,
+                                                    lineNumber: 413,
                                                     columnNumber: 37
                                                 }, this))
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 255,
+                                            lineNumber: 411,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                    lineNumber: 250,
+                                    lineNumber: 406,
                                     columnNumber: 25
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 249,
+                                lineNumber: 405,
                                 columnNumber: 21
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/components/Analytics.jsx",
-                        lineNumber: 247,
+                        lineNumber: 403,
                         columnNumber: 17
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4168,14 +4816,14 @@ function Analytics({ data }) {
                                         color: "#C06820"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 265,
+                                        lineNumber: 421,
                                         columnNumber: 40
                                     }, this),
                                     " TOP ORIGIN COUNTRIES"
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 265,
+                                lineNumber: 421,
                                 columnNumber: 21
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$component$2f$ResponsiveContainer$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ResponsiveContainer"], {
@@ -4191,7 +4839,7 @@ function Analytics({ data }) {
                                             stroke: "#EDE7DB"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 268,
+                                            lineNumber: 424,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$XAxis$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["XAxis"], {
@@ -4204,7 +4852,7 @@ function Analytics({ data }) {
                                             allowDecimals: false
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 269,
+                                            lineNumber: 425,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$YAxis$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["YAxis"], {
@@ -4219,14 +4867,14 @@ function Analytics({ data }) {
                                             width: 50
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 270,
+                                            lineNumber: 426,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$component$2f$Tooltip$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Tooltip"], {
                                             contentStyle: TT
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 271,
+                                            lineNumber: 427,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$Bar$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Bar"], {
@@ -4240,30 +4888,30 @@ function Analytics({ data }) {
                                             ]
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 272,
+                                            lineNumber: 428,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                    lineNumber: 267,
+                                    lineNumber: 423,
                                     columnNumber: 25
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 266,
+                                lineNumber: 422,
                                 columnNumber: 21
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/components/Analytics.jsx",
-                        lineNumber: 264,
+                        lineNumber: 420,
                         columnNumber: 17
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/components/Analytics.jsx",
-                lineNumber: 246,
+                lineNumber: 402,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4285,14 +4933,14 @@ function Analytics({ data }) {
                                         color: "#C06820"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 281,
+                                        lineNumber: 437,
                                         columnNumber: 40
                                     }, this),
                                     " WEIGHT DISCREPANCY vs RISK SCORE"
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 281,
+                                lineNumber: 437,
                                 columnNumber: 21
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$component$2f$ResponsiveContainer$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ResponsiveContainer"], {
@@ -4305,7 +4953,7 @@ function Analytics({ data }) {
                                             stroke: "#EDE7DB"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 284,
+                                            lineNumber: 440,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$XAxis$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["XAxis"], {
@@ -4328,7 +4976,7 @@ function Analytics({ data }) {
                                             }
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 285,
+                                            lineNumber: 441,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$YAxis$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["YAxis"], {
@@ -4351,7 +4999,7 @@ function Analytics({ data }) {
                                             }
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 287,
+                                            lineNumber: 443,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$component$2f$Tooltip$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Tooltip"], {
@@ -4362,7 +5010,7 @@ function Analytics({ data }) {
                                                 ]
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 289,
+                                            lineNumber: 445,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$Scatter$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Scatter"], {
@@ -4372,29 +5020,29 @@ function Analytics({ data }) {
                                                     opacity: 0.7
                                                 }, i, false, {
                                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                                    lineNumber: 292,
+                                                    lineNumber: 448,
                                                     columnNumber: 37
                                                 }, this))
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 290,
+                                            lineNumber: 446,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                    lineNumber: 283,
+                                    lineNumber: 439,
                                     columnNumber: 25
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 282,
+                                lineNumber: 438,
                                 columnNumber: 21
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/components/Analytics.jsx",
-                        lineNumber: 280,
+                        lineNumber: 436,
                         columnNumber: 17
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4408,14 +5056,14 @@ function Analytics({ data }) {
                                         color: "#C06820"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 300,
+                                        lineNumber: 456,
                                         columnNumber: 40
                                     }, this),
                                     " DWELL TIME DISTRIBUTION"
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 300,
+                                lineNumber: 456,
                                 columnNumber: 21
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$component$2f$ResponsiveContainer$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ResponsiveContainer"], {
@@ -4429,7 +5077,7 @@ function Analytics({ data }) {
                                             stroke: "#EDE7DB"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 303,
+                                            lineNumber: 459,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$XAxis$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["XAxis"], {
@@ -4441,7 +5089,7 @@ function Analytics({ data }) {
                                             }
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 304,
+                                            lineNumber: 460,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$YAxis$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["YAxis"], {
@@ -4453,14 +5101,14 @@ function Analytics({ data }) {
                                             allowDecimals: false
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 305,
+                                            lineNumber: 461,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$component$2f$Tooltip$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Tooltip"], {
                                             contentStyle: TT
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 306,
+                                            lineNumber: 462,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("defs", {
@@ -4477,7 +5125,7 @@ function Analytics({ data }) {
                                                         stopOpacity: 0.3
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                                        lineNumber: 309,
+                                                        lineNumber: 465,
                                                         columnNumber: 37
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("stop", {
@@ -4486,18 +5134,18 @@ function Analytics({ data }) {
                                                         stopOpacity: 0.02
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                                        lineNumber: 310,
+                                                        lineNumber: 466,
                                                         columnNumber: 37
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 308,
+                                                lineNumber: 464,
                                                 columnNumber: 33
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 307,
+                                            lineNumber: 463,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$Area$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Area"], {
@@ -4512,30 +5160,30 @@ function Analytics({ data }) {
                                             }
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 313,
+                                            lineNumber: 469,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                    lineNumber: 302,
+                                    lineNumber: 458,
                                     columnNumber: 25
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 301,
+                                lineNumber: 457,
                                 columnNumber: 21
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/components/Analytics.jsx",
-                        lineNumber: 299,
+                        lineNumber: 455,
                         columnNumber: 17
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/components/Analytics.jsx",
-                lineNumber: 279,
+                lineNumber: 435,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4557,14 +5205,14 @@ function Analytics({ data }) {
                                         color: "#C06820"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 324,
+                                        lineNumber: 480,
                                         columnNumber: 40
                                     }, this),
                                     " OFF-HOURS DECLARATION ANALYSIS"
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 324,
+                                lineNumber: 480,
                                 columnNumber: 21
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4591,30 +5239,30 @@ function Analytics({ data }) {
                                                             fill: d.color
                                                         }, i, false, {
                                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                                            lineNumber: 329,
+                                                            lineNumber: 485,
                                                             columnNumber: 69
                                                         }, this))
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                                    lineNumber: 328,
+                                                    lineNumber: 484,
                                                     columnNumber: 33
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$component$2f$Tooltip$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Tooltip"], {
                                                     contentStyle: TT
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                                    lineNumber: 331,
+                                                    lineNumber: 487,
                                                     columnNumber: 33
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 327,
+                                            lineNumber: 483,
                                             columnNumber: 29
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 326,
+                                        lineNumber: 482,
                                         columnNumber: 25
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4640,7 +5288,7 @@ function Analytics({ data }) {
                                                                 color: "#C62828"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                lineNumber: 337,
+                                                                lineNumber: 493,
                                                                 columnNumber: 37
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4650,16 +5298,16 @@ function Analytics({ data }) {
                                                                     color: '#7A6E5D',
                                                                     fontWeight: 600
                                                                 },
-                                                                children: "Off-Hours (10PM–6AM)"
+                                                                children: "Off-Hours (10PM-6AM)"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                lineNumber: 338,
+                                                                lineNumber: 494,
                                                                 columnNumber: 37
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                                        lineNumber: 336,
+                                                        lineNumber: 492,
                                                         columnNumber: 33
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4675,7 +5323,7 @@ function Analytics({ data }) {
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                                        lineNumber: 340,
+                                                        lineNumber: 496,
                                                         columnNumber: 33
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4691,13 +5339,13 @@ function Analytics({ data }) {
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                                        lineNumber: 341,
+                                                        lineNumber: 497,
                                                         columnNumber: 33
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 335,
+                                                lineNumber: 491,
                                                 columnNumber: 29
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4715,7 +5363,7 @@ function Analytics({ data }) {
                                                                 color: "#2E7D32"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                lineNumber: 347,
+                                                                lineNumber: 503,
                                                                 columnNumber: 37
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4728,13 +5376,13 @@ function Analytics({ data }) {
                                                                 children: "Business Hours"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                lineNumber: 348,
+                                                                lineNumber: 504,
                                                                 columnNumber: 37
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                                        lineNumber: 346,
+                                                        lineNumber: 502,
                                                         columnNumber: 33
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4750,7 +5398,7 @@ function Analytics({ data }) {
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                                        lineNumber: 350,
+                                                        lineNumber: 506,
                                                         columnNumber: 33
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4766,25 +5414,25 @@ function Analytics({ data }) {
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                                        lineNumber: 351,
+                                                        lineNumber: 507,
                                                         columnNumber: 33
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 345,
+                                                lineNumber: 501,
                                                 columnNumber: 29
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 334,
+                                        lineNumber: 490,
                                         columnNumber: 25
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 325,
+                                lineNumber: 481,
                                 columnNumber: 21
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4802,13 +5450,13 @@ function Analytics({ data }) {
                                 children: "⚠ Off-hours declarations are a key risk signal. The AI model assigns +0.08 risk weight to containers declared between 10PM and 6AM."
                             }, void 0, false, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 357,
+                                lineNumber: 513,
                                 columnNumber: 21
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/components/Analytics.jsx",
-                        lineNumber: 323,
+                        lineNumber: 479,
                         columnNumber: 17
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4822,14 +5470,14 @@ function Analytics({ data }) {
                                         color: "#C06820"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 364,
+                                        lineNumber: 520,
                                         columnNumber: 40
                                     }, this),
-                                    " VALUE PER KG — RISK CORRELATION"
+                                    " VALUE PER KG: RISK CORRELATION"
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 364,
+                                lineNumber: 520,
                                 columnNumber: 21
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$component$2f$ResponsiveContainer$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ResponsiveContainer"], {
@@ -4844,7 +5492,7 @@ function Analytics({ data }) {
                                             stroke: "#EDE7DB"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 367,
+                                            lineNumber: 523,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$XAxis$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["XAxis"], {
@@ -4856,7 +5504,7 @@ function Analytics({ data }) {
                                             }
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 368,
+                                            lineNumber: 524,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$YAxis$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["YAxis"], {
@@ -4878,7 +5526,7 @@ function Analytics({ data }) {
                                             }
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 369,
+                                            lineNumber: 525,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$YAxis$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["YAxis"], {
@@ -4904,14 +5552,14 @@ function Analytics({ data }) {
                                             }
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 371,
+                                            lineNumber: 527,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$component$2f$Tooltip$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Tooltip"], {
                                             contentStyle: TT
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 374,
+                                            lineNumber: 530,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$Bar$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Bar"], {
@@ -4928,7 +5576,7 @@ function Analytics({ data }) {
                                             name: "Containers"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 375,
+                                            lineNumber: 531,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$Bar$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Bar"], {
@@ -4944,18 +5592,18 @@ function Analytics({ data }) {
                                             name: "Avg Risk Score"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/components/Analytics.jsx",
-                                            lineNumber: 376,
+                                            lineNumber: 532,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                    lineNumber: 366,
+                                    lineNumber: 522,
                                     columnNumber: 25
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 365,
+                                lineNumber: 521,
                                 columnNumber: 21
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4973,19 +5621,19 @@ function Analytics({ data }) {
                                 children: "💰 Zero-value declarations (+0.20 risk) and ultra-high value/kg (>$5000, +0.15 risk) are strong smuggling indicators used by the AI model."
                             }, void 0, false, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 379,
+                                lineNumber: 535,
                                 columnNumber: 21
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/components/Analytics.jsx",
-                        lineNumber: 363,
+                        lineNumber: 519,
                         columnNumber: 17
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/components/Analytics.jsx",
-                lineNumber: 320,
+                lineNumber: 476,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5007,14 +5655,14 @@ function Analytics({ data }) {
                                         color: "#C06820"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 390,
+                                        lineNumber: 546,
                                         columnNumber: 40
                                     }, this),
                                     " HS CODE RISK HOTSPOTS"
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 390,
+                                lineNumber: 546,
                                 columnNumber: 21
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5045,7 +5693,7 @@ function Analytics({ data }) {
                                                 children: h.hsCode
                                             }, void 0, false, {
                                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 398,
+                                                lineNumber: 554,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5066,12 +5714,12 @@ function Analytics({ data }) {
                                                     }
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                                    lineNumber: 402,
+                                                    lineNumber: 558,
                                                     columnNumber: 37
                                                 }, this)
                                             }, void 0, false, {
                                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 401,
+                                                lineNumber: 557,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5086,7 +5734,7 @@ function Analytics({ data }) {
                                                 children: h.avgRisk.toFixed(3)
                                             }, void 0, false, {
                                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 408,
+                                                lineNumber: 564,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5099,23 +5747,23 @@ function Analytics({ data }) {
                                                     fontWeight: 500
                                                 },
                                                 children: [
-                                                    "×",
+                                                    "x",
                                                     h.total
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 411,
+                                                lineNumber: 567,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, i, true, {
                                         fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 393,
+                                        lineNumber: 549,
                                         columnNumber: 29
                                     }, this))
                             }, void 0, false, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 391,
+                                lineNumber: 547,
                                 columnNumber: 21
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5133,682 +5781,27 @@ function Analytics({ data }) {
                                 children: "📦 HS codes are standardised commodity classifications. Codes like 7113 (jewelry) and 8471 (electronics) historically carry higher smuggling risk."
                             }, void 0, false, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 417,
+                                lineNumber: 573,
                                 columnNumber: 21
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/components/Analytics.jsx",
-                        lineNumber: 389,
+                        lineNumber: 545,
                         columnNumber: 17
                     }, this),
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        style: CARD,
-                        children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                style: LABEL,
-                                children: [
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$clock$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Clock$3e$__["Clock"], {
-                                        size: 16,
-                                        color: "#C06820"
-                                    }, void 0, false, {
-                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 424,
-                                        columnNumber: 40
-                                    }, this),
-                                    " DECLARATION TIME — 24-HOUR RISK MAP ",
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                        style: {
-                                            fontSize: 10,
-                                            color: '#7A6E5D',
-                                            fontWeight: 500,
-                                            letterSpacing: 0.5
-                                        },
-                                        children: "(click any hour)"
-                                    }, void 0, false, {
-                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 424,
-                                        columnNumber: 112
-                                    }, this)
-                                ]
-                            }, void 0, true, {
-                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 424,
-                                columnNumber: 21
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                style: {
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(12, 1fr)',
-                                    gap: 4,
-                                    marginBottom: 4
-                                },
-                                children: timeHeatmap.slice(0, 12).map((h, i)=>{
-                                    const intensity = h.total === 0 ? 0 : h.avgRisk;
-                                    const bg = h.total === 0 ? '#F5F0E8' : intensity >= 0.5 ? `rgba(198,40,40,${0.15 + intensity * 0.5})` : intensity >= 0.25 ? `rgba(230,81,0,${0.1 + intensity * 0.4})` : `rgba(46,125,50,${0.08 + intensity * 0.3})`;
-                                    const isSelected = selectedHour === h.hour;
-                                    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        onClick: ()=>h.total > 0 ? setSelectedHour(isSelected ? null : h.hour) : null,
-                                        style: {
-                                            position: 'relative',
-                                            borderRadius: 6,
-                                            background: bg,
-                                            border: isSelected ? '2px solid #C06820' : h.isOffHours ? '1px solid rgba(198,40,40,0.25)' : '1px solid #EDE7DB',
-                                            padding: '8px 4px',
-                                            textAlign: 'center',
-                                            cursor: h.total > 0 ? 'pointer' : 'default',
-                                            minHeight: 72,
-                                            transform: isSelected ? 'scale(1.05)' : 'scale(1)',
-                                            transition: 'all 0.15s ease',
-                                            boxShadow: isSelected ? '0 2px 8px rgba(192,104,32,0.25)' : 'none'
-                                        },
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                style: {
-                                                    fontFamily: 'Quicksand',
-                                                    fontSize: 10,
-                                                    fontWeight: 700,
-                                                    color: h.isOffHours ? '#C62828' : '#7A6E5D',
-                                                    marginBottom: 4
-                                                },
-                                                children: h.label
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 449,
-                                                columnNumber: 37
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                style: {
-                                                    fontFamily: 'Quicksand',
-                                                    fontSize: 16,
-                                                    fontWeight: 700,
-                                                    color: '#2C2418'
-                                                },
-                                                children: h.total
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 452,
-                                                columnNumber: 37
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                style: {
-                                                    fontFamily: 'Quicksand',
-                                                    fontSize: 9,
-                                                    color: '#7A6E5D',
-                                                    marginTop: 2,
-                                                    fontWeight: 600
-                                                },
-                                                children: h.total > 0 ? `r:${h.avgRisk.toFixed(2)}` : '—'
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 455,
-                                                columnNumber: 37
-                                            }, this),
-                                            h.isOffHours && h.total > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                style: {
-                                                    position: 'absolute',
-                                                    top: 2,
-                                                    right: 2,
-                                                    width: 5,
-                                                    height: 5,
-                                                    borderRadius: '50%',
-                                                    background: '#C62828'
-                                                }
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 459,
-                                                columnNumber: 41
-                                            }, this)
-                                        ]
-                                    }, i, true, {
-                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 438,
-                                        columnNumber: 33
-                                    }, this);
-                                })
-                            }, void 0, false, {
-                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 426,
-                                columnNumber: 21
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                style: {
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(12, 1fr)',
-                                    gap: 4,
-                                    marginBottom: 12
-                                },
-                                children: timeHeatmap.slice(12).map((h, i)=>{
-                                    const intensity = h.total === 0 ? 0 : h.avgRisk;
-                                    const bg = h.total === 0 ? '#F5F0E8' : intensity >= 0.5 ? `rgba(198,40,40,${0.15 + intensity * 0.5})` : intensity >= 0.25 ? `rgba(230,81,0,${0.1 + intensity * 0.4})` : `rgba(46,125,50,${0.08 + intensity * 0.3})`;
-                                    const isSelected = selectedHour === h.hour;
-                                    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        onClick: ()=>h.total > 0 ? setSelectedHour(isSelected ? null : h.hour) : null,
-                                        style: {
-                                            position: 'relative',
-                                            borderRadius: 6,
-                                            background: bg,
-                                            border: isSelected ? '2px solid #C06820' : h.isOffHours ? '1px solid rgba(198,40,40,0.25)' : '1px solid #EDE7DB',
-                                            padding: '8px 4px',
-                                            textAlign: 'center',
-                                            cursor: h.total > 0 ? 'pointer' : 'default',
-                                            minHeight: 72,
-                                            transform: isSelected ? 'scale(1.05)' : 'scale(1)',
-                                            transition: 'all 0.15s ease',
-                                            boxShadow: isSelected ? '0 2px 8px rgba(192,104,32,0.25)' : 'none'
-                                        },
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                style: {
-                                                    fontFamily: 'Quicksand',
-                                                    fontSize: 10,
-                                                    fontWeight: 700,
-                                                    color: h.isOffHours ? '#C62828' : '#7A6E5D',
-                                                    marginBottom: 4
-                                                },
-                                                children: h.label
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 489,
-                                                columnNumber: 37
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                style: {
-                                                    fontFamily: 'Quicksand',
-                                                    fontSize: 16,
-                                                    fontWeight: 700,
-                                                    color: '#2C2418'
-                                                },
-                                                children: h.total
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 492,
-                                                columnNumber: 37
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                style: {
-                                                    fontFamily: 'Quicksand',
-                                                    fontSize: 9,
-                                                    color: '#7A6E5D',
-                                                    marginTop: 2,
-                                                    fontWeight: 600
-                                                },
-                                                children: h.total > 0 ? `r:${h.avgRisk.toFixed(2)}` : '—'
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 495,
-                                                columnNumber: 37
-                                            }, this),
-                                            h.isOffHours && h.total > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                style: {
-                                                    position: 'absolute',
-                                                    top: 2,
-                                                    right: 2,
-                                                    width: 5,
-                                                    height: 5,
-                                                    borderRadius: '50%',
-                                                    background: '#C62828'
-                                                }
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 499,
-                                                columnNumber: 41
-                                            }, this)
-                                        ]
-                                    }, i, true, {
-                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 478,
-                                        columnNumber: 33
-                                    }, this);
-                                })
-                            }, void 0, false, {
-                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 466,
-                                columnNumber: 21
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                style: {
-                                    display: 'flex',
-                                    gap: 16,
-                                    fontSize: 11,
-                                    color: '#7A6E5D',
-                                    fontWeight: 500,
-                                    marginBottom: selectedHour !== null ? 16 : 0
-                                },
-                                children: [
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                        style: {
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 4
-                                        },
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                style: {
-                                                    width: 8,
-                                                    height: 8,
-                                                    borderRadius: 2,
-                                                    background: 'rgba(46,125,50,0.25)'
-                                                }
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 508,
-                                                columnNumber: 89
-                                            }, this),
-                                            " Low Risk"
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 508,
-                                        columnNumber: 25
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                        style: {
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 4
-                                        },
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                style: {
-                                                    width: 8,
-                                                    height: 8,
-                                                    borderRadius: 2,
-                                                    background: 'rgba(230,81,0,0.3)'
-                                                }
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 509,
-                                                columnNumber: 89
-                                            }, this),
-                                            " Medium Risk"
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 509,
-                                        columnNumber: 25
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                        style: {
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 4
-                                        },
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                style: {
-                                                    width: 8,
-                                                    height: 8,
-                                                    borderRadius: 2,
-                                                    background: 'rgba(198,40,40,0.5)'
-                                                }
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 510,
-                                                columnNumber: 89
-                                            }, this),
-                                            " Critical Risk"
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 510,
-                                        columnNumber: 25
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                        style: {
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 4
-                                        },
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                style: {
-                                                    width: 5,
-                                                    height: 5,
-                                                    borderRadius: '50%',
-                                                    background: '#C62828'
-                                                }
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 511,
-                                                columnNumber: 89
-                                            }, this),
-                                            " Off-Hours"
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 511,
-                                        columnNumber: 25
-                                    }, this)
-                                ]
-                            }, void 0, true, {
-                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 507,
-                                columnNumber: 21
-                            }, this),
-                            selectedHour !== null && selectedContainers.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                style: {
-                                    animation: 'fadeInUp 0.25s ease-out'
-                                },
-                                children: [
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        style: {
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                            marginBottom: 12
-                                        },
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                style: {
-                                                    fontFamily: 'Quicksand',
-                                                    fontSize: 13,
-                                                    fontWeight: 700,
-                                                    color: '#C06820'
-                                                },
-                                                children: [
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$ship$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Ship$3e$__["Ship"], {
-                                                        size: 14,
-                                                        style: {
-                                                            marginRight: 6,
-                                                            verticalAlign: -2
-                                                        }
-                                                    }, void 0, false, {
-                                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                                        lineNumber: 519,
-                                                        columnNumber: 37
-                                                    }, this),
-                                                    selectedContainers.length,
-                                                    " CONTAINER",
-                                                    selectedContainers.length > 1 ? 'S' : '',
-                                                    " DECLARED AT ",
-                                                    String(selectedHour).padStart(2, '0'),
-                                                    ":00"
-                                                ]
-                                            }, void 0, true, {
-                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 518,
-                                                columnNumber: 33
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                onClick: ()=>setSelectedHour(null),
-                                                style: {
-                                                    cursor: 'pointer',
-                                                    padding: 4,
-                                                    borderRadius: 4,
-                                                    background: '#EDE7DB',
-                                                    display: 'flex'
-                                                },
-                                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$x$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__X$3e$__["X"], {
-                                                    size: 14,
-                                                    color: "#7A6E5D"
-                                                }, void 0, false, {
-                                                    fileName: "[project]/src/app/components/Analytics.jsx",
-                                                    lineNumber: 523,
-                                                    columnNumber: 37
-                                                }, this)
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 522,
-                                                columnNumber: 33
-                                            }, this)
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 517,
-                                        columnNumber: 29
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        style: {
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: 8
-                                        },
-                                        children: selectedContainers.map((c, ci)=>{
-                                            const decl = Number(c.Declared_Weight) || 1;
-                                            const meas = Number(c.Measured_Weight) || 0;
-                                            const wtDelta = ((meas - decl) / decl * 100).toFixed(1);
-                                            const vpk = decl > 0 ? ((Number(c.Declared_Value) || 0) / decl).toFixed(2) : '0';
-                                            const riskColor = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$data$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getRiskColor"])(c.Risk_Level);
-                                            return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                style: {
-                                                    background: '#FFFDF8',
-                                                    border: `1px solid ${riskColor}22`,
-                                                    borderLeft: `4px solid ${riskColor}`,
-                                                    borderRadius: 8,
-                                                    padding: '12px 16px'
-                                                },
-                                                children: [
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                        style: {
-                                                            display: 'flex',
-                                                            justifyContent: 'space-between',
-                                                            alignItems: 'center',
-                                                            marginBottom: 8
-                                                        },
-                                                        children: [
-                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                                style: {
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    gap: 8
-                                                                },
-                                                                children: [
-                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                                        style: {
-                                                                            fontFamily: 'Quicksand',
-                                                                            fontSize: 14,
-                                                                            fontWeight: 700,
-                                                                            color: '#2C2418'
-                                                                        },
-                                                                        children: c.Container_ID
-                                                                    }, void 0, false, {
-                                                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                        lineNumber: 541,
-                                                                        columnNumber: 53
-                                                                    }, this),
-                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                                        style: {
-                                                                            fontFamily: 'Quicksand',
-                                                                            fontSize: 10,
-                                                                            fontWeight: 700,
-                                                                            padding: '2px 8px',
-                                                                            borderRadius: 4,
-                                                                            background: `${riskColor}15`,
-                                                                            color: riskColor,
-                                                                            letterSpacing: 1
-                                                                        },
-                                                                        children: [
-                                                                            c.Risk_Level === 'Critical' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$triangle$2d$alert$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__AlertTriangle$3e$__["AlertTriangle"], {
-                                                                                size: 10,
-                                                                                style: {
-                                                                                    marginRight: 3,
-                                                                                    verticalAlign: -1
-                                                                                }
-                                                                            }, void 0, false, {
-                                                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                                lineNumber: 548,
-                                                                                columnNumber: 89
-                                                                            }, this),
-                                                                            c.Risk_Level.toUpperCase()
-                                                                        ]
-                                                                    }, void 0, true, {
-                                                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                        lineNumber: 542,
-                                                                        columnNumber: 53
-                                                                    }, this)
-                                                                ]
-                                                            }, void 0, true, {
-                                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                lineNumber: 540,
-                                                                columnNumber: 49
-                                                            }, this),
-                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                                style: {
-                                                                    fontFamily: 'Quicksand',
-                                                                    fontSize: 18,
-                                                                    fontWeight: 700,
-                                                                    color: riskColor
-                                                                },
-                                                                children: c.Risk_Score.toFixed(3)
-                                                            }, void 0, false, {
-                                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                lineNumber: 552,
-                                                                columnNumber: 49
-                                                            }, this)
-                                                        ]
-                                                    }, void 0, true, {
-                                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                                        lineNumber: 539,
-                                                        columnNumber: 45
-                                                    }, this),
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                        style: {
-                                                            display: 'grid',
-                                                            gridTemplateColumns: 'repeat(5, 1fr)',
-                                                            gap: 8
-                                                        },
-                                                        children: [
-                                                            {
-                                                                label: 'ROUTE',
-                                                                value: `${c.Origin_Country} → ${c.Destination_Country}`,
-                                                                icon: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$map$2d$pin$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__MapPin$3e$__["MapPin"], {
-                                                                    size: 11
-                                                                }, void 0, false, {
-                                                                    fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                    lineNumber: 556,
-                                                                    columnNumber: 134
-                                                                }, this)
-                                                            },
-                                                            {
-                                                                label: 'WT DELTA',
-                                                                value: `${wtDelta}%`,
-                                                                icon: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$weight$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Weight$3e$__["Weight"], {
-                                                                    size: 11
-                                                                }, void 0, false, {
-                                                                    fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                    lineNumber: 557,
-                                                                    columnNumber: 102
-                                                                }, this)
-                                                            },
-                                                            {
-                                                                label: 'VALUE/KG',
-                                                                value: `$${vpk}`,
-                                                                icon: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$dollar$2d$sign$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__DollarSign$3e$__["DollarSign"], {
-                                                                    size: 11
-                                                                }, void 0, false, {
-                                                                    fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                    lineNumber: 558,
-                                                                    columnNumber: 98
-                                                                }, this)
-                                                            },
-                                                            {
-                                                                label: 'DWELL',
-                                                                value: `${c.Dwell_Time_Hours}h`,
-                                                                icon: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$clock$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Clock$3e$__["Clock"], {
-                                                                    size: 11
-                                                                }, void 0, false, {
-                                                                    fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                    lineNumber: 559,
-                                                                    columnNumber: 110
-                                                                }, this)
-                                                            },
-                                                            {
-                                                                label: 'HS CODE',
-                                                                value: c.HS_Code,
-                                                                icon: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$package$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Package$3e$__["Package"], {
-                                                                    size: 11
-                                                                }, void 0, false, {
-                                                                    fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                    lineNumber: 560,
-                                                                    columnNumber: 97
-                                                                }, this)
-                                                            }
-                                                        ].map((f, fi)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                                children: [
-                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                                        style: {
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            gap: 3,
-                                                                            marginBottom: 2
-                                                                        },
-                                                                        children: [
-                                                                            /*#__PURE__*/ __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].cloneElement(f.icon, {
-                                                                                color: '#7A6E5D'
-                                                                            }),
-                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                                                style: {
-                                                                                    fontFamily: 'Quicksand',
-                                                                                    fontSize: 9,
-                                                                                    color: '#7A6E5D',
-                                                                                    letterSpacing: 1,
-                                                                                    fontWeight: 700
-                                                                                },
-                                                                                children: f.label
-                                                                            }, void 0, false, {
-                                                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                                lineNumber: 565,
-                                                                                columnNumber: 61
-                                                                            }, this)
-                                                                        ]
-                                                                    }, void 0, true, {
-                                                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                        lineNumber: 563,
-                                                                        columnNumber: 57
-                                                                    }, this),
-                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                                        style: {
-                                                                            fontFamily: 'Quicksand',
-                                                                            fontSize: 13,
-                                                                            fontWeight: 600,
-                                                                            color: '#2C2418'
-                                                                        },
-                                                                        children: f.value
-                                                                    }, void 0, false, {
-                                                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                        lineNumber: 567,
-                                                                        columnNumber: 57
-                                                                    }, this)
-                                                                ]
-                                                            }, fi, true, {
-                                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                                lineNumber: 562,
-                                                                columnNumber: 53
-                                                            }, this))
-                                                    }, void 0, false, {
-                                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                                        lineNumber: 554,
-                                                        columnNumber: 45
-                                                    }, this)
-                                                ]
-                                            }, ci, true, {
-                                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                                lineNumber: 534,
-                                                columnNumber: 41
-                                            }, this);
-                                        })
-                                    }, void 0, false, {
-                                        fileName: "[project]/src/app/components/Analytics.jsx",
-                                        lineNumber: 526,
-                                        columnNumber: 29
-                                    }, this)
-                                ]
-                            }, void 0, true, {
-                                fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 516,
-                                columnNumber: 25
-                            }, this)
-                        ]
-                    }, void 0, true, {
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(DeclarationTimeMap, {
+                        timeHeatmap: timeHeatmap,
+                        data: data
+                    }, void 0, false, {
                         fileName: "[project]/src/app/components/Analytics.jsx",
-                        lineNumber: 423,
+                        lineNumber: 578,
                         columnNumber: 17
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/components/Analytics.jsx",
-                lineNumber: 386,
+                lineNumber: 542,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5822,14 +5815,14 @@ function Analytics({ data }) {
                                 color: "#C06820"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/components/Analytics.jsx",
-                                lineNumber: 582,
+                                lineNumber: 583,
                                 columnNumber: 36
                             }, this),
                             " RISK BREAKDOWN BY TRADE REGIME"
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/components/Analytics.jsx",
-                        lineNumber: 582,
+                        lineNumber: 583,
                         columnNumber: 17
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$component$2f$ResponsiveContainer$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ResponsiveContainer"], {
@@ -5844,7 +5837,7 @@ function Analytics({ data }) {
                                     stroke: "#EDE7DB"
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                    lineNumber: 585,
+                                    lineNumber: 586,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$XAxis$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["XAxis"], {
@@ -5857,7 +5850,7 @@ function Analytics({ data }) {
                                     }
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                    lineNumber: 586,
+                                    lineNumber: 587,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$YAxis$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["YAxis"], {
@@ -5869,14 +5862,14 @@ function Analytics({ data }) {
                                     allowDecimals: false
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                    lineNumber: 587,
+                                    lineNumber: 588,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$component$2f$Tooltip$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Tooltip"], {
                                     contentStyle: TT
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                    lineNumber: 588,
+                                    lineNumber: 589,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$component$2f$Legend$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Legend"], {
@@ -5887,7 +5880,7 @@ function Analytics({ data }) {
                                     }
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                    lineNumber: 589,
+                                    lineNumber: 590,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$Bar$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Bar"], {
@@ -5903,7 +5896,7 @@ function Analytics({ data }) {
                                     ]
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                    lineNumber: 590,
+                                    lineNumber: 591,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$Bar$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Bar"], {
@@ -5913,7 +5906,7 @@ function Analytics({ data }) {
                                     fill: "#E65100"
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                    lineNumber: 591,
+                                    lineNumber: 592,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$recharts$2f$es6$2f$cartesian$2f$Bar$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Bar"], {
@@ -5929,30 +5922,30 @@ function Analytics({ data }) {
                                     ]
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/components/Analytics.jsx",
-                                    lineNumber: 592,
+                                    lineNumber: 593,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/components/Analytics.jsx",
-                            lineNumber: 584,
+                            lineNumber: 585,
                             columnNumber: 21
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/app/components/Analytics.jsx",
-                        lineNumber: 583,
+                        lineNumber: 584,
                         columnNumber: 17
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/components/Analytics.jsx",
-                lineNumber: 581,
+                lineNumber: 582,
                 columnNumber: 13
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/app/components/Analytics.jsx",
-        lineNumber: 220,
+        lineNumber: 376,
         columnNumber: 9
     }, this);
 }
@@ -8098,6 +8091,32 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$components$2f$
         columnNumber: 5
     }, this);
 }
+// ── LocalStorage helpers for data persistence ──
+const STORAGE_KEY = 'smartcontainer_data';
+function saveDataToStorage(rows) {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
+    } catch (e) {
+        console.warn('Could not save data to localStorage:', e);
+    }
+}
+function loadDataFromStorage() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+    } catch (e) {
+        console.warn('Could not load data from localStorage:', e);
+    }
+    return null;
+}
+function clearDataFromStorage() {
+    try {
+        localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {}
+}
 function App() {
     const [isAuthenticated, setIsAuthenticated] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
     const [user, setUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
@@ -8108,7 +8127,8 @@ function App() {
     // Reclassify containers when threshold changes
     const handleThresholdChange = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((newThreshold)=>{
         setCriticalThreshold(newThreshold);
-        setData((prev)=>prev.map((row)=>{
+        setData((prev)=>{
+            const updated = prev.map((row)=>{
                 const score = row.Risk_Score;
                 let level;
                 if (score >= newThreshold) level = 'Critical';
@@ -8118,7 +8138,10 @@ function App() {
                     ...row,
                     Risk_Level: level
                 };
-            }));
+            });
+            saveDataToStorage(updated);
+            return updated;
+        });
     }, []);
     const [loading, setLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
     const [progress, setProgress] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(0);
@@ -8130,15 +8153,21 @@ function App() {
         return ()=>clearInterval(t);
     }, []);
     // Normalize API snake_case keys to PascalCase expected by components
-    const normalizeRow = (row)=>({
+    const normalizeRow = (row)=>{
+        const getNum = (val)=>{
+            if (val === null || val === undefined || val === 'nan' || val === 'NaN') return 0;
+            const parsed = parseFloat(val);
+            return isNaN(parsed) ? 0 : parsed;
+        };
+        return {
             Container_ID: row.container_id ?? row.Container_ID,
-            Risk_Score: row.risk_score ?? row.Risk_Score ?? 0,
+            Risk_Score: getNum(row.risk_score ?? row.Risk_Score),
             Risk_Level: row.risk_level ?? row.Risk_Level ?? 'Low Risk',
             Anomaly_Flag: row.anomaly_flag ?? row.Anomaly_Flag ?? 0,
-            Declared_Value: row.declared_value ?? row.Declared_Value ?? 0,
-            Declared_Weight: row.declared_weight ?? row.Declared_Weight ?? 0,
-            Measured_Weight: row.measured_weight ?? row.Measured_Weight ?? 0,
-            Dwell_Time_Hours: row.dwell_time_hours ?? row.Dwell_Time_Hours ?? 0,
+            Declared_Value: getNum(row.declared_value ?? row.Declared_Value),
+            Declared_Weight: getNum(row.declared_weight ?? row.Declared_Weight),
+            Measured_Weight: getNum(row.measured_weight ?? row.Measured_Weight),
+            Dwell_Time_Hours: getNum(row.dwell_time_hours ?? row.Dwell_Time_Hours),
             Origin_Country: row.origin_country ?? row.Origin_Country ?? '',
             Destination_Country: row.destination_country ?? row.Destination_Country ?? '',
             HS_Code: row.hs_code ?? row.HS_Code ?? '',
@@ -8147,63 +8176,97 @@ function App() {
             Declaration_Date: row.declaration_date ?? row.Declaration_Date ?? '',
             Declaration_Time: row.declaration_time ?? row.Declaration_Time ?? '',
             Explanation_Summary: row.explanation_summary ?? row.Explanation_Summary ?? ''
-        });
-    // Fetch data on login
+        };
+    };
+    // ── Authentication & Data Initialization ──
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
-        if (isAuthenticated) {
+        const token = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$auth$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getToken"])();
+        if (!token) {
+            setIsAuthenticated(false);
+            return;
+        }
+        // Verify user session, then load data
+        __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$api$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["api"].getUsersMe().then((userData)=>{
+            setUser(userData);
+            setIsAuthenticated(true);
+            // Try to load persisted uploaded data from localStorage first
+            const cached = loadDataFromStorage();
+            if (cached && cached.length > 0) {
+                const normalized = cached.map(normalizeRow);
+                setData(normalized);
+                return; // We have local data, no need to fetch from backend
+            }
+            // Otherwise try backend
             setLoading(true);
             setLoadMsg('Fetching Intelligence Data...');
-            Promise.all([
-                __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$api$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["api"].getStats().catch((e)=>null),
-                __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$api$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["api"].getResults(1, 100).catch((e)=>null)
+            return Promise.all([
+                __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$api$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["api"].getStats().catch(()=>null),
+                __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$api$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["api"].getResults(1, 100).catch(()=>null)
             ]).then(([statsRes, resultsRes])=>{
                 if (statsRes) setStats(statsRes);
                 const apiData = resultsRes?.data || [];
                 if (apiData.length > 0) {
-                    setData(apiData.map(normalizeRow));
-                } else {
-                    // Fall back to sample data if API has no predictions
-                    setData(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$data$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SAMPLE_DATA"]);
+                    const normalized = apiData.map(normalizeRow);
+                    setData(normalized);
+                    saveDataToStorage(normalized);
                 }
+                // If no backend data and no cached data, data stays [] (empty dashboard)
                 setLoading(false);
             });
-        }
-    }, [
-        isAuthenticated
-    ]);
-    // Handle Token on Initialize
-    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
-        const token = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$auth$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getToken"])();
-        if (token) {
-            __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$api$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["api"].getUsersMe().then((userData)=>{
-                setUser(userData);
-                setIsAuthenticated(true);
-            }).catch(()=>{
-                (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$auth$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["removeToken"])();
-            });
-        }
+        }).catch(()=>{
+            (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$auth$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["removeToken"])();
+            setIsAuthenticated(false);
+            setLoading(false);
+        });
     }, []);
     const handleLogin = (loggedUser)=>{
         setUser(loggedUser);
         setIsAuthenticated(true);
         setCurrentView('overview');
+        // Try to load persisted data from localStorage
+        const cached = loadDataFromStorage();
+        if (cached && cached.length > 0) {
+            const normalized = cached.map(normalizeRow);
+            setData(normalized);
+            setLoading(false);
+            return;
+        }
+        // Otherwise try backend
+        setLoading(true);
+        setLoadMsg('Fetching Intelligence Data...');
+        Promise.all([
+            __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$api$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["api"].getStats().catch(()=>null),
+            __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$api$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["api"].getResults(1, 100).catch(()=>null)
+        ]).then(([statsRes, resultsRes])=>{
+            if (statsRes) setStats(statsRes);
+            const apiData = resultsRes?.data || [];
+            if (apiData.length > 0) {
+                const normalized = apiData.map(normalizeRow);
+                setData(normalized);
+                saveDataToStorage(normalized);
+            }
+            setLoading(false);
+        });
     };
     const handleLogout = ()=>{
         (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$auth$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["removeToken"])();
+        clearDataFromStorage();
         setIsAuthenticated(false);
         setUser(null);
+        setData([]);
+        setStats(null);
     };
-    // Shared generic CSV parser
+    // Shared generic CSV parser (local processing + localStorage persistence)
     const processCSV = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((file)=>{
         setLoading(true);
         setProgress(0);
-        setLoadMsg('Parsing CSV…');
+        setLoadMsg('Parsing CSV...');
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$papaparse$2f$papaparse$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].parse(file, {
             header: true,
             skipEmptyLines: true,
             complete: (result)=>{
                 const rows = result.data;
-                setLoadMsg(`Processing ${rows.length.toLocaleString()} containers…`);
+                setLoadMsg(`Processing ${rows.length.toLocaleString()} containers...`);
                 let idx = 0;
                 const scored = [];
                 const batch = Math.max(1, Math.floor(rows.length / 50));
@@ -8211,11 +8274,13 @@ function App() {
                     const end = Math.min(idx + batch, rows.length);
                     for(; idx < end; idx++)scored.push((0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$data$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["computeMockRisk"])(rows[idx]));
                     setProgress(Math.floor(idx / rows.length * 100));
-                    setLoadMsg(`Scoring container ${idx.toLocaleString()} of ${rows.length.toLocaleString()}…`);
+                    setLoadMsg(`Scoring container ${idx.toLocaleString()} of ${rows.length.toLocaleString()}...`);
                     if (idx < rows.length) requestAnimationFrame(process);
                     else {
                         setTimeout(()=>{
-                            setData(scored);
+                            const cleaned = scored.map(normalizeRow);
+                            setData(cleaned);
+                            saveDataToStorage(cleaned); // Persist to localStorage!
                             setLoading(false);
                             setCurrentView('overview'); // redirect to overview on success
                         }, 600);
@@ -8230,7 +8295,7 @@ function App() {
             onLogin: handleLogin
         }, void 0, false, {
             fileName: "[project]/src/app/page.jsx",
-            lineNumber: 170,
+            lineNumber: 257,
             columnNumber: 12
         }, this);
     }
@@ -8242,16 +8307,16 @@ function App() {
                 data: data
             }, void 0, false, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 176,
+                lineNumber: 263,
                 columnNumber: 38
             }, this);
-            break; // stats can be added here if needed
+            break;
         case 'containers':
             ViewComponent = /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$components$2f$Containers$2e$jsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
                 data: data
             }, void 0, false, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 177,
+                lineNumber: 264,
                 columnNumber: 40
             }, this);
             break;
@@ -8260,7 +8325,7 @@ function App() {
                 data: data
             }, void 0, false, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 178,
+                lineNumber: 265,
                 columnNumber: 39
             }, this);
             break;
@@ -8269,7 +8334,7 @@ function App() {
                 onFileLoaded: processCSV
             }, void 0, false, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 179,
+                lineNumber: 266,
                 columnNumber: 36
             }, this);
             break;
@@ -8279,14 +8344,14 @@ function App() {
                 onThresholdChange: handleThresholdChange
             }, void 0, false, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 180,
+                lineNumber: 267,
                 columnNumber: 38
             }, this);
             break;
         case 'admin':
             ViewComponent = /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$components$2f$Admin$2e$jsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {}, void 0, false, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 181,
+                lineNumber: 268,
                 columnNumber: 35
             }, this);
             break;
@@ -8295,7 +8360,7 @@ function App() {
                 data: data
             }, void 0, false, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 182,
+                lineNumber: 269,
                 columnNumber: 30
             }, this);
     }
@@ -8311,7 +8376,7 @@ function App() {
                 message: loadMsg
             }, void 0, false, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 187,
+                lineNumber: 274,
                 columnNumber: 19
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$app$2f$components$2f$Sidebar$2e$jsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
@@ -8321,7 +8386,7 @@ function App() {
                 userId: user
             }, void 0, false, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 189,
+                lineNumber: 276,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -8371,7 +8436,7 @@ function App() {
                                             }
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.jsx",
-                                            lineNumber: 201,
+                                            lineNumber: 288,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -8385,13 +8450,13 @@ function App() {
                                             children: "SYSTEM ACTIVE"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.jsx",
-                                            lineNumber: 202,
+                                            lineNumber: 289,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 200,
+                                    lineNumber: 287,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -8412,7 +8477,7 @@ function App() {
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 204,
+                                    lineNumber: 291,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -8429,18 +8494,18 @@ function App() {
                                     children: "CUSTOMS"
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.jsx",
-                                    lineNumber: 207,
+                                    lineNumber: 294,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/page.jsx",
-                            lineNumber: 199,
+                            lineNumber: 286,
                             columnNumber: 11
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/app/page.jsx",
-                        lineNumber: 193,
+                        lineNumber: 280,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("main", {
@@ -8453,19 +8518,19 @@ function App() {
                         children: ViewComponent
                     }, void 0, false, {
                         fileName: "[project]/src/app/page.jsx",
-                        lineNumber: 212,
+                        lineNumber: 299,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/page.jsx",
-                lineNumber: 191,
+                lineNumber: 278,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/app/page.jsx",
-        lineNumber: 186,
+        lineNumber: 273,
         columnNumber: 5
     }, this);
 }
