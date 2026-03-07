@@ -1,0 +1,96 @@
+# =============================================================================
+# SmartContainer Risk Engine Backend - Git Ignore File
+# Security & environment configuration
+# =============================================================================
+
+# ========================
+# Environment & Secrets
+# ========================
+.env                    # Local environment variables (MUST NOT commit)
+.env.local              # Local overrides
+.env.*.local            # Environment-specific local overrides
+.env.production          # Production secrets (NEVER commit)
+
+# ========================
+# Development Files
+# ========================
+*.pyc                   # Python compiled files
+*.pyo                   # Python optimized compiled files
+*.pyd                   # Python DLL files
+__pycache__/            # Python cache directories
+*.egg-info/             # Package build artifacts
+.Python                 # Venv Python build
+*.egg                   # Package distribution files
+dist/                   # Distribution packages
+build/                  # Build artifacts
+
+# ========================
+# Virtual Environments
+# ========================
+venv/
+env/
+ENV/
+.venv
+
+# ========================
+# IDE & Editor Files
+# ========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+.atom/
+.history/
+.ionide/
+.vim/
+
+# ========================
+# Database Files
+# ========================
+*.db                    # SQLite databases
+*.sqlite                # SQLite databases
+*.sqlite3               # SQLite databases
+smartcontainer.db       # Application database
+
+# ========================
+# Application Data
+# ========================
+output/                 # Generated output files
+logs/                   # Application logs
+*.log                   # Log files
+temp/                   # Temporary files
+tmp/                    # Temporary files
+
+# ========================
+# OS Files
+# ========================
+Thumbs.db
+Desktop.ini
+
+# ========================
+# CI/CD & Testing
+# ========================
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.hypothesis/
+junit/
+
+# ========================
+# IDE Python files
+# ========================
+.pylintrc
+.mypy_cache/
+.dmypy.json
+dmypy.json
+*.pem
+*.key

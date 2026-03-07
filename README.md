@@ -5,15 +5,13 @@
     <strong>Next-Generation AI Customs Intelligence & Targeting Platform</strong>
     <br />
     <br />
+    <a href="#-monorepo-structure">Structure</a>
+    ·
+    <a href="#-render-deployment">Deploy to Render</a>
+    ·
     <a href="#-solution-overview">Overview</a>
     ·
     <a href="#-architecture">Architecture</a>
-    ·
-    <a href="#-tech-stack">Tech Stack</a>
-    ·
-    <a href="#-live-demo--screenshots">Screenshots</a>
-    ·
-    <a href="#-team">Team</a>
   </p>
   <p align="center">
     <strong>Team: Prototype Zero</strong>
@@ -22,13 +20,65 @@
 
 <hr />
 
+## 📁 Monorepo Structure
+
+```
+.
+├── frontend/              # React/Next.js SPA Dashboard
+│   ├── src/              # React components & pages
+│   ├── public/           # Static assets
+│   ├── package.json      # Frontend dependencies
+│   └── run_frontend.bat  # Development launcher
+│
+├── backend/              # Python FastAPI Server
+│   ├── api/              # FastAPI routes & handlers
+│   ├── src/              # Core business logic
+│   ├── models/           # ML models (XGBoost, LightGBM, Isolation Forest)
+│   ├── tests/            # Unit & integration tests
+│   ├── scripts/          # Utility scripts
+│   ├── Problem/          # Training datasets
+│   ├── output/           # Generated output data
+│   ├── requirements.txt  # Python dependencies
+│   └── run_backend.bat   # Development launcher
+│
+└── docs/                 # Technical documentation
+    ├── ARCHITECTURE.md   # System architecture
+    ├── SOLUTION_APPROACH.md
+    ├── TECH_STACK.md
+    └── images/           # Diagrams & screenshots
+```
+
+## 🚀 Render Deployment
+
+### Quick Deploy Frontend
+1. Go to [Render Dashboard](https://dashboard.render.com)
+2. Create **New Web Service**
+3. Connect GitHub repo
+4. **Root Directory**: `frontend`
+5. **Build Command**: `npm install && npm run build`
+6. **Start Command**: `npm run start`
+7. **Environment**: Add `NEXT_PUBLIC_API_URL=https://your-backend.onrender.com`
+
+### Quick Deploy Backend
+1. Create **New Web Service** in Render
+2. Connect GitHub repo
+3. **Root Directory**: `backend`
+4. **Build Command**: `pip install -r requirements.txt`
+5. **Start Command**: `python -m uvicorn api.main:app --host 0.0.0.0 --port $PORT`
+6. **Python Version**: Uses `backend/runtime.txt` automatically
+
+### Connecting Frontend to Backend
+Set frontend environment variable to point to your deployed backend URL.
+
+---
+
 ## 📚 Documentation
 
-For a deep dive into our methodology, system design, and technology choices, please refer to the following specific documents:
+For detailed information, see:
 
-- **[🏗️ System Architecture](docs/ARCHITECTURE.md)**: Details the frontend SPA structure, core API endpoints, ML pipeline data flow, and ensemble architecture.
-- **[🎯 Solution Approach](docs/SOLUTION_APPROACH.md)**: In-depth explanation of our approach, including feature engineering, the multi-model ensemble (XGBoost, LightGBM, Isolation Forest), rule-based algorithms, and computer vision image analysis.
-- **[🛠️ Tech Stack](docs/TECH_STACK.md)**: Detailed breakdown of the libraries, infrastructure, and rationale for choosing each piece of technology in the stack.
+- **[🏗️ System Architecture](docs/ARCHITECTURE.md)**: Frontend SPA structure, API endpoints, ML pipeline, ensemble architecture
+- **[🎯 Solution Approach](docs/SOLUTION_APPROACH.md)**: Feature engineering, multi-model ensemble, rule-based algorithms, CV image analysis
+- **[🛠️ Tech Stack](docs/TECH_STACK.md)**: Libraries, infrastructure, and technology rationale
 
 ---
 
