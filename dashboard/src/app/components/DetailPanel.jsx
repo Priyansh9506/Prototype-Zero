@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { X, AlertTriangle, ShieldCheck, Zap } from 'lucide-react';
 import { getRiskColor, getRiskGlow } from '../data';
+import { API_BASE_URL } from '../api';
 
 export default function DetailPanel({ container, onClose }) {
     if (!container) return null;
@@ -146,7 +147,7 @@ export default function DetailPanel({ container, onClose }) {
                                         {container.Image_Analysis.detailed_results.map((res, idx) => (
                                             <div key={idx} style={{ position: 'relative', width: 64, height: 64, flexShrink: 0, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.1)' }}>
                                                 <img 
-                                                    src={`http://localhost:8000/containers/${container.Container_ID}/images/${res.filename}`} 
+                                                    src={`${API_BASE_URL}/containers/${container.Container_ID}/images/${res.filename}`} 
                                                     alt={`evidence-${idx}`} 
                                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                 />

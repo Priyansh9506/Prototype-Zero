@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Upload, X, ImageIcon, Search, AlertCircle, Loader2, Zap, ShieldCheck, BarChart3 } from 'lucide-react';
+import { API_BASE_URL } from '../api';
 
 const BoundingBoxOverlay = ({ detections, dimensions }) => {
   if (!detections || !dimensions) return null;
@@ -99,7 +100,7 @@ export default function ImageAnalysis({ onBack, onAnalysisComplete }) {
     });
 
     try {
-      const response = await fetch(`http://localhost:8000/analyze-container-image?container_id=${containerId}`, {
+      const response = await fetch(`${API_BASE_URL}/analyze-container-image?container_id=${containerId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`
