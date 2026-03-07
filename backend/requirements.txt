@@ -40,14 +40,13 @@ lightgbm==4.5.0
 # ========================
 # Computer Vision & Image Analysis
 # ========================
-inference-sdk          # Roboflow API client
 opencv-python-headless # Headless OpenCV (no GUI dependencies)
 
 # =============================================================================
 # Notes:
 # - scikit-learn, xgboost, lightgbm: Only needed for inference with pre-trained models
 # - Training dependencies (shap, optuna, imbalanced-learn) removed - use separate training env
-# - inference-sdk: Required for Roboflow image analysis (set ROBOFLOW_API_KEY env var)
+# - inference-sdk: Removed due to build compatibility (image analysis disabled)
 # - All packages pinned to specific versions for reproducibility
 # =============================================================================
 
