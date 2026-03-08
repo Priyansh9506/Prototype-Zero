@@ -41,12 +41,12 @@ lightgbm==4.5.0
 # Computer Vision & Image Analysis
 # ========================
 opencv-python-headless # Headless OpenCV (no GUI dependencies)
+inference-sdk
 
 # =============================================================================
 # Notes:
 # - scikit-learn, xgboost, lightgbm: Only needed for inference with pre-trained models
 # - Training dependencies (shap, optuna, imbalanced-learn) removed - use separate training env
-# - inference-sdk: Removed due to build compatibility (image analysis disabled)
 # - All packages pinned to specific versions for reproducibility
 # =============================================================================
 
