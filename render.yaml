@@ -17,6 +17,6 @@ services:
       - key: SECRET_KEY
         generateValue: true # Render will generate a strong secret key automatically
       - key: CORS_ORIGINS
-        value: "https://your-frontend.vercel.app,http://localhost:3000" # Update frontend domain here
+        value: "https://prototype-zero.vercel.app,http://localhost:3000" # Updated with your exact Vercel domain
       - key: ROBOFLOW_API_KEY
         sync: false # Add it manually to dashboard if you need image analysis
