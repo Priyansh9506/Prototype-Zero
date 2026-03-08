@@ -51,6 +51,7 @@
 ## 🚀 Render Deployment
 
 ### Quick Deploy Frontend
+
 1. Go to [Render Dashboard](https://dashboard.render.com)
 2. Create **New Web Service**
 3. Connect GitHub repo
@@ -60,6 +61,7 @@
 7. **Environment**: Add `NEXT_PUBLIC_API_URL=https://your-backend.onrender.com`
 
 ### Quick Deploy Backend
+
 1. Create **New Web Service** in Render
 2. Connect GitHub repo
 3. **Root Directory**: `backend`
@@ -68,6 +70,7 @@
 6. **Python Version**: Uses `backend/runtime.txt` automatically
 
 ### Connecting Frontend to Backend
+
 Set frontend environment variable to point to your deployed backend URL.
 
 ---
@@ -78,6 +81,7 @@ For detailed information, see:
 
 - **[🏗️ System Architecture](docs/ARCHITECTURE.md)**: Frontend SPA structure, API endpoints, ML pipeline, ensemble architecture
 - **[🎯 Solution Approach](docs/SOLUTION_APPROACH.md)**: Feature engineering, multi-model ensemble, rule-based algorithms, CV image analysis
+- **[🧠 ML Pipeline Explainer](docs/ML_PIPELINE_EXPLAINER.md)**: Deep dive into the machine learning ecosystem and model training pipeline
 - **[🛠️ Tech Stack](docs/TECH_STACK.md)**: Libraries, infrastructure, and technology rationale
 
 ---
