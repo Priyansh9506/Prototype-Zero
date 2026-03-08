@@ -47,11 +47,17 @@ function RoleSelect({ value, onChange }) {
 }
 
 /* ─── Primary Action Button ─── */
-function ActionBtn({ onClick, label, color = '#C06820', disabled }) {
+function ActionBtn({ onClick, label, color = '#C06820', disabled, isProcessing }) {
     return (
-        <button onClick={onClick} disabled={disabled}
-            style={{ width: '100%', padding: '14px', borderRadius: 8, border: 'none', background: disabled ? '#D9CDBA' : color, color: '#FFF', fontFamily: 'Quicksand', fontSize: 14, fontWeight: 800, letterSpacing: 1, cursor: disabled ? 'not-allowed' : 'pointer', transition: 'opacity 0.2s' }}>
-            {label}
+        <button onClick={onClick} disabled={disabled || isProcessing}
+            style={{ width: '100%', padding: '14px', borderRadius: 8, border: 'none', background: (disabled || isProcessing) ? '#D9CDBA' : color, color: '#FFF', fontFamily: 'Quicksand', fontSize: 14, fontWeight: 800, letterSpacing: 1, cursor: (disabled || isProcessing) ? 'not-allowed' : 'pointer', transition: 'opacity 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
+            {isProcessing ? (
+                <>
+                    <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#FFF', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                    PROCESSING...
+                </>
+            ) : label}
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </button>
     );
 }
@@ -59,7 +65,9 @@ function ActionBtn({ onClick, label, color = '#C06820', disabled }) {
 export default function Admin() {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState('');
+    const [successMsg, setSuccessMsg] = useState('');
     const [tab, setTab] = useState('pending'); // pending | all
 
     // Modal states
@@ -79,16 +87,16 @@ export default function Admin() {
     const [editPassword, setEditPassword] = useState('');
     const [editRole, setEditRole] = useState('');
 
-    const fetchUsers = async () => {
+    const fetchUsers = async (background = false) => {
         try {
-            setLoading(true);
+            if (!background) setLoading(true);
             const data = await api.getUsers();
             setUsers(data);
             setError('');
         } catch (err) {
             setError('Failed to fetch users: ' + err.message);
         } finally {
-            setLoading(false);
+            if (!background) setLoading(false);
         }
     };
 
@@ -98,23 +106,43 @@ export default function Admin() {
     const allUsers = users;
 
     // ── Handlers ──
+    const showSuccess = (msg) => {
+        setSuccessMsg(msg);
+        setTimeout(() => setSuccessMsg(''), 3000);
+    };
+
     const handleVerify = async (userId, role) => {
-        try { await api.verifyUser(userId, role); fetchUsers(); }
-        catch (err) { alert('Failed: ' + err.message); }
+        try { 
+            setActionLoading(true); 
+            await api.verifyUser(userId, role); 
+            showSuccess('User successfully verified!');
+            fetchUsers(true); 
+        }
+        catch (err) { setError('Failed to verify: ' + err.message); }
+        finally { setActionLoading(false); }
     };
 
     const handleReject = async (userId) => {
-        try { await api.deleteUser(userId); fetchUsers(); }
-        catch (err) { alert('Failed: ' + err.message); }
+        try { 
+            setActionLoading(true); 
+            await api.deleteUser(userId); 
+            showSuccess('User request rejected.');
+            fetchUsers(true); 
+        }
+        catch (err) { setError('Failed to reject: ' + err.message); }
+        finally { setActionLoading(false); }
     };
 
     const handleCreate = async () => {
         try {
+            setActionLoading(true);
             await api.createUser(newUsername, newEmail, newPassword, newRole);
             setShowCreate(false);
             setNewUsername(''); setNewEmail(''); setNewPassword(''); setNewRole('officer');
-            fetchUsers();
-        } catch (err) { alert('Failed: ' + err.message); }
+            showSuccess('User created successfully!');
+            fetchUsers(true);
+        } catch (err) { setError('Failed to create user: ' + err.message); }
+        finally { setActionLoading(false); }
     };
 
     const openEdit = (u) => {
@@ -127,6 +155,7 @@ export default function Admin() {
 
     const handleUpdate = async () => {
         try {
+            setActionLoading(true);
             await api.updateUser(editUser.id, {
                 username: editUsername !== editUser.username ? editUsername : null,
                 email: editEmail !== editUser.email ? editEmail : null,
@@ -134,13 +163,22 @@ export default function Admin() {
                 role: editRole !== editUser.role ? editRole : null,
             });
             setEditUser(null);
-            fetchUsers();
-        } catch (err) { alert('Failed: ' + err.message); }
+            showSuccess('User updated successfully!');
+            fetchUsers(true);
+        } catch (err) { setError('Failed to update user: ' + err.message); }
+        finally { setActionLoading(false); }
     };
 
     const handleDelete = async (userId) => {
-        try { await api.deleteUser(userId); setDeleteConfirm(null); fetchUsers(); }
-        catch (err) { alert('Failed: ' + err.message); }
+        try { 
+            setActionLoading(true); 
+            await api.deleteUser(userId); 
+            setDeleteConfirm(null); 
+            showSuccess('User deleted permanently.');
+            fetchUsers(true); 
+        }
+        catch (err) { setError('Failed to delete user: ' + err.message); }
+        finally { setActionLoading(false); }
     };
 
     const tabStyle = (active) => ({
@@ -158,10 +196,10 @@ export default function Admin() {
                     <div style={{ fontFamily: 'Quicksand', fontSize: 13, color: '#7A6E5D', fontWeight: 600, marginTop: 4 }}>Manage personnel & clearance requests</div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => setShowCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', borderRadius: 8, background: '#C06820', border: 'none', color: '#FFF', fontFamily: 'Quicksand', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 1 }}>
+                    <button onClick={() => setShowCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', borderRadius: 8, background: '#C06820', border: 'none', color: '#FFF', fontFamily: 'Quicksand', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 1, opacity: actionLoading ? 0.6 : 1 }} disabled={actionLoading}>
                         <Plus size={14} /> CREATE USER
                     </button>
-                    <button onClick={fetchUsers} style={{ padding: '10px 16px', borderRadius: 8, background: '#F5F0E8', border: '1px solid #D9CDBA', color: '#C06820', fontFamily: 'Quicksand', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>REFRESH</button>
+                    <button onClick={() => fetchUsers(false)} style={{ padding: '10px 16px', borderRadius: 8, background: '#F5F0E8', border: '1px solid #D9CDBA', color: '#C06820', fontFamily: 'Quicksand', fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }} disabled={actionLoading}>REFRESH</button>
                 </div>
             </div>
 
@@ -173,9 +211,18 @@ export default function Admin() {
                 <button onClick={() => setTab('all')} style={tabStyle(tab === 'all')}>ALL USERS ({allUsers.length})</button>
             </div>
 
+            {/* Notifications */}
+            {successMsg && (
+                <div style={{ padding: '16px', background: 'rgba(46,125,50,0.06)', borderRadius: 8, border: '1px solid rgba(46,125,50,0.2)', color: '#2E7D32', display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'Quicksand', fontSize: 13, fontWeight: 600, animation: 'fadeIn 0.3s' }}>
+                    <UserCheck size={16} />{successMsg}
+                </div>
+            )}
             {error && (
-                <div style={{ padding: '16px', background: 'rgba(198,40,40,0.06)', borderRadius: 8, border: '1px solid rgba(198,40,40,0.2)', color: '#C62828', display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'Quicksand', fontSize: 13, fontWeight: 600 }}>
-                    <AlertTriangle size={16} />{error}
+                <div style={{ padding: '16px', background: 'rgba(198,40,40,0.06)', borderRadius: 8, border: '1px solid rgba(198,40,40,0.2)', color: '#C62828', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'Quicksand', fontSize: 13, fontWeight: 600, animation: 'fadeIn 0.3s' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <AlertTriangle size={16} />{error}
+                    </div>
+                    <button onClick={() => setError('')} style={{ background: 'transparent', border: 'none', color: '#C62828', cursor: 'pointer' }}><X size={14} /></button>
                 </div>
             )}
 
@@ -198,13 +245,13 @@ export default function Admin() {
                                 </div>
                             </div>
                             <div style={{ display: 'flex', gap: 8 }}>
-                                <button onClick={() => handleVerify(u.id, 'officer')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 6, background: '#C06820', border: 'none', color: '#FFF', fontFamily: 'Quicksand', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                                <button onClick={() => handleVerify(u.id, 'officer')} disabled={actionLoading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 6, background: actionLoading ? '#D9CDBA' : '#C06820', border: 'none', color: '#FFF', fontFamily: 'Quicksand', fontSize: 11, fontWeight: 700, cursor: actionLoading ? 'not-allowed' : 'pointer' }}>
                                     <UserCheck size={14} /> APPROVE
                                 </button>
-                                <button onClick={() => handleVerify(u.id, 'admin')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 6, background: 'transparent', border: '1px solid #C06820', color: '#C06820', fontFamily: 'Quicksand', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                                <button onClick={() => handleVerify(u.id, 'admin')} disabled={actionLoading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 6, background: 'transparent', border: `1px solid ${actionLoading ? '#D9CDBA' : '#C06820'}`, color: actionLoading ? '#D9CDBA' : '#C06820', fontFamily: 'Quicksand', fontSize: 11, fontWeight: 700, cursor: actionLoading ? 'not-allowed' : 'pointer' }}>
                                     <Shield size={14} /> AS ADMIN
                                 </button>
-                                <button onClick={() => handleReject(u.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 6, background: 'transparent', border: '1px solid #C62828', color: '#C62828', fontFamily: 'Quicksand', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                                <button onClick={() => handleReject(u.id)} disabled={actionLoading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 6, background: 'transparent', border: `1px solid ${actionLoading ? '#D9CDBA' : '#C62828'}`, color: actionLoading ? '#D9CDBA' : '#C62828', fontFamily: 'Quicksand', fontSize: 11, fontWeight: 700, cursor: actionLoading ? 'not-allowed' : 'pointer' }}>
                                     <Trash2 size={14} /> REJECT
                                 </button>
                             </div>
@@ -249,10 +296,10 @@ export default function Admin() {
                                     </td>
                                     <td style={{ padding: '14px 24px', textAlign: 'right' }}>
                                         <div style={{ display: 'inline-flex', gap: 6 }}>
-                                            <button onClick={() => openEdit(u)} style={{ padding: '6px 10px', borderRadius: 6, background: '#F5F0E8', border: '1px solid #D9CDBA', color: '#C06820', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'Quicksand', fontSize: 11, fontWeight: 700 }}>
+                                            <button onClick={() => openEdit(u)} disabled={actionLoading} style={{ padding: '6px 10px', borderRadius: 6, background: '#F5F0E8', border: '1px solid #D9CDBA', color: actionLoading ? '#D9CDBA' : '#C06820', cursor: actionLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'Quicksand', fontSize: 11, fontWeight: 700 }}>
                                                 <Pencil size={12} /> EDIT
                                             </button>
-                                            <button onClick={() => setDeleteConfirm(u)} style={{ padding: '6px 10px', borderRadius: 6, background: 'transparent', border: '1px solid rgba(198,40,40,0.3)', color: '#C62828', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'Quicksand', fontSize: 11, fontWeight: 700 }}>
+                                            <button onClick={() => setDeleteConfirm(u)} disabled={actionLoading} style={{ padding: '6px 10px', borderRadius: 6, background: 'transparent', border: '1px solid rgba(198,40,40,0.3)', color: actionLoading ? '#D9CDBA' : '#C62828', cursor: actionLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'Quicksand', fontSize: 11, fontWeight: 700 }}>
                                                 <Trash2 size={12} /> DELETE
                                             </button>
                                         </div>
@@ -271,7 +318,7 @@ export default function Admin() {
                     <Field label="EMAIL" value={newEmail} onChange={setNewEmail} type="email" placeholder="john@customs.gov" />
                     <Field label="PASSWORD" value={newPassword} onChange={setNewPassword} type="password" placeholder="••••••••" />
                     <RoleSelect value={newRole} onChange={setNewRole} />
-                    <ActionBtn onClick={handleCreate} label="CREATE USER" disabled={!newUsername || !newEmail || !newPassword} />
+                    <ActionBtn onClick={handleCreate} label="CREATE USER" disabled={!newUsername || !newEmail || !newPassword} isProcessing={actionLoading} />
                 </Modal>
             )}
 
@@ -282,7 +329,7 @@ export default function Admin() {
                     <Field label="EMAIL" value={editEmail} onChange={setEditEmail} type="email" />
                     <Field label="NEW PASSWORD (leave blank to keep)" value={editPassword} onChange={setEditPassword} type="password" placeholder="••••••••" />
                     <RoleSelect value={editRole} onChange={setEditRole} />
-                    <ActionBtn onClick={handleUpdate} label="SAVE CHANGES" />
+                    <ActionBtn onClick={handleUpdate} label="SAVE CHANGES" isProcessing={actionLoading} />
                 </Modal>
             )}
 
@@ -293,8 +340,8 @@ export default function Admin() {
                         Are you sure you want to permanently delete the user <strong>{deleteConfirm.username}</strong>? This action cannot be undone.
                     </div>
                     <div style={{ display: 'flex', gap: 12 }}>
-                        <button onClick={() => setDeleteConfirm(null)} style={{ flex: 1, padding: '14px', borderRadius: 8, border: '1px solid #D9CDBA', background: 'transparent', color: '#7A6E5D', fontFamily: 'Quicksand', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>CANCEL</button>
-                        <button onClick={() => handleDelete(deleteConfirm.id)} style={{ flex: 1, padding: '14px', borderRadius: 8, border: 'none', background: '#C62828', color: '#FFF', fontFamily: 'Quicksand', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>DELETE USER</button>
+                        <button onClick={() => setDeleteConfirm(null)} disabled={actionLoading} style={{ flex: 1, padding: '14px', borderRadius: 8, border: '1px solid #D9CDBA', background: 'transparent', color: actionLoading ? '#D9CDBA' : '#7A6E5D', fontFamily: 'Quicksand', fontSize: 14, fontWeight: 700, cursor: actionLoading ? 'not-allowed' : 'pointer' }}>CANCEL</button>
+                        <ActionBtn onClick={() => handleDelete(deleteConfirm.id)} label="DELETE USER" color="#C62828" isProcessing={actionLoading} />
                     </div>
                 </Modal>
             )}
