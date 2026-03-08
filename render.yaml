@@ -11,7 +11,7 @@ services:
       - key: LOG_LEVEL
         value: DEBUG
       - key: PYTHON_VERSION
-        value: 3.10.x # Explicitly set a supported python version
+        value: "3.10.13" # Explicitly set a supported python version
       - key: DATABASE_URL
         sync: false # Requires manual setup in Render dashboard because it uses Supabase
       - key: SECRET_KEY
