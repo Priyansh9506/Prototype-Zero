@@ -61,18 +61,24 @@ export default function ImageAnalysis({ onBack, onAnalysisComplete }) {
     if (status === 'uploading') return;
     const droppedFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
     if (files.length + droppedFiles.length > 5) {
-      alert("Maximum 5 images allowed");
+      setStatus('error');
+      setMessage("Maximum 5 images allowed per analysis");
       return;
     }
+    setStatus('idle');
+    setMessage('');
     setFiles(prev => [...prev, ...droppedFiles]);
   };
 
   const onFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
     if (files.length + selectedFiles.length > 5) {
-      alert("Maximum 5 images allowed");
+      setStatus('error');
+      setMessage("Maximum 5 images allowed per analysis");
       return;
     }
+    setStatus('idle');
+    setMessage('');
     setFiles(prev => [...prev, ...selectedFiles]);
   };
 
@@ -83,11 +89,13 @@ export default function ImageAnalysis({ onBack, onAnalysisComplete }) {
 
   const handleUpload = async () => {
     if (!containerId) {
-      alert("Please enter a Container ID");
+      setStatus('error');
+      setMessage("Please enter a Target Container ID");
       return;
     }
     if (files.length === 0) {
-      alert("Please select at least one image");
+      setStatus('error');
+      setMessage("Please select at least one image to analyze");
       return;
     }
 
