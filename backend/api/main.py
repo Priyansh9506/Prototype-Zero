@@ -135,6 +135,10 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
     
+    existing_email = db.query(models_db.User).filter(models_db.User.email == user.email).first()
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
     hashed_password = auth.get_password_hash(user.password)
     db_user = models_db.User(
         username=user.username,
@@ -212,6 +216,10 @@ def admin_create_user(
     db_user = auth.get_user_by_username(db, username=user.username)
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
+    
+    existing_email = db.query(models_db.User).filter(models_db.User.email == user.email).first()
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already registered")
     
     if role not in [r.value for r in models_db.UserRole]:
         raise HTTPException(status_code=400, detail="Invalid role specified")
