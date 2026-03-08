@@ -50,11 +50,18 @@ function RoleSelect({ value, onChange }) {
 function ActionBtn({ onClick, label, color = '#C06820', disabled, isProcessing }) {
     return (
         <button onClick={onClick} disabled={disabled || isProcessing}
-            style={{ width: '100%', padding: '14px', borderRadius: 8, border: 'none', background: (disabled || isProcessing) ? '#D9CDBA' : color, color: '#FFF', fontFamily: 'Quicksand', fontSize: 14, fontWeight: 800, letterSpacing: 1, cursor: (disabled || isProcessing) ? 'not-allowed' : 'pointer', transition: 'opacity 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
+            style={{ 
+                width: '100%', padding: '14px', borderRadius: 8, border: isProcessing ? '1px solid #2E7D32' : 'none', 
+                background: isProcessing ? '#F1F8E9' : (disabled ? '#D9CDBA' : color), 
+                color: isProcessing ? '#2E7D32' : '#FFF', 
+                fontFamily: 'Quicksand', fontSize: 14, fontWeight: 800, letterSpacing: 1, 
+                cursor: (disabled || isProcessing) ? 'not-allowed' : 'pointer', transition: 'all 0.2s', 
+                display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 
+            }}>
             {isProcessing ? (
                 <>
-                    <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#FFF', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
                     PROCESSING...
+                    <div style={{ width: 14, height: 14, border: '2px solid rgba(46,125,50,0.3)', borderTopColor: '#2E7D32', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
                 </>
             ) : label}
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
