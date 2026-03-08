@@ -26,6 +26,4 @@ Thumbs.db
 # Database
 *.sqlite3
 # Application specific
-output/
-data/
 temp/
