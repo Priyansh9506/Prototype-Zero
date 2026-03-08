@@ -702,6 +702,9 @@ async def analyze_container_image(
                     width, height = img.size
 
                 # Run Roboflow inference
+                if ROBOFLOW_CLIENT is None:
+                    raise HTTPException(status_code=501, detail="Image analysis is disabled on server.")
+
                 result = ROBOFLOW_CLIENT.infer(
                     tmp_path,
                     model_id="container-damage-detection-uekkr/1"
