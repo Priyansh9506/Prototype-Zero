@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: smartcontainer-api
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: DEBUG
+      - key: PYTHON_VERSION
+        value: 3.10.x # Explicitly set a supported python version
+      - key: DATABASE_URL
+        sync: false # Requires manual setup in Render dashboard because it uses Supabase
+      - key: SECRET_KEY
+        generateValue: true # Render will generate a strong secret key automatically
+      - key: CORS_ORIGINS
+        value: "https://your-frontend.vercel.app,http://localhost:3000" # Update frontend domain here
+      - key: ROBOFLOW_API_KEY
+        sync: false # Add it manually to dashboard if you need image analysis
